@@ -1,0 +1,891 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}</style>
+</head>
+<body>
+<title>Family Toon Party</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&family=Nunito:wght@500;700;800&display=swap">
+<style>
+/* Layout: one-column phone app — sticky tab bar, three screens (Characters / Town / Poster); the Town is a live canvas world */
+:root{
+  --bg:#E6F2FB; --paper:#FFFFFF; --ink:#1E2A45; --muted:#58668A; --line:#CBDDED;
+  --tomato:#F0603C; --grass:#36A866; --sun:#FFC23A; --sky:#2F7DE1; --soft:#F2F8FD;
+  --display:"Baloo 2","PingFang SC","Noto Sans SC","Microsoft YaHei",system-ui,sans-serif;
+  --body:"Nunito","PingFang SC","Noto Sans SC","Microsoft YaHei",system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#111A2C; --paper:#1A2440; --ink:#EEF2FB; --muted:#A4B1CF; --line:#2C3A5E; --soft:#202C4C; color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#111A2C; --paper:#1A2440; --ink:#EEF2FB; --muted:#A4B1CF; --line:#2C3A5E; --soft:#202C4C; color-scheme:dark}
+[hidden]{display:none!important}
+html,body{min-height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+.wrap{max-width:820px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px 40px;display:flex;flex-direction:column;gap:14px}
+header h1{font-family:var(--display);font-weight:800;font-size:30px;line-height:1.1;margin:4px 0 2px;text-wrap:balance}
+header h1 span{color:var(--tomato)}
+header p{margin:0;color:var(--muted);font-size:13px}
+nav{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;display:grid;grid-template-columns:repeat(3,1fr);gap:6px;background:var(--bg);padding-block:6px}
+nav button{font-family:var(--display);font-weight:700;font-size:15px;line-height:1.15;border:2px solid var(--line);background:var(--paper);color:var(--ink);border-radius:14px;padding:8px 4px;cursor:pointer}
+nav button small{display:block;font-family:var(--body);font-weight:700;font-size:11px;color:var(--muted)}
+nav button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+nav button[aria-pressed="true"] small{color:var(--bg);opacity:.75}
+button:focus-visible,input:focus-visible,.file:focus-within{outline:3px solid var(--sun);outline-offset:2px}
+section{display:flex;flex-direction:column;gap:12px}
+h2{font-family:var(--display);font-weight:800;font-size:22px;margin:0;line-height:1.2}
+h2 small{display:block;font-family:var(--body);font-size:13px;font-weight:700;color:var(--muted)}
+.note{font-size:12.5px;color:var(--muted);background:var(--soft);border-radius:12px;padding:10px 12px;margin:0}
+.msg{font-size:13px;font-weight:800;border-radius:12px;padding:10px 12px;margin:0;background:var(--soft);color:var(--ink)}
+.msg.err{background:var(--tomato);color:#fff}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.card{position:relative;background:var(--paper);border:2px solid var(--line);border-radius:18px;padding:10px;display:flex;flex-direction:column;gap:8px}
+.card.drop{border-color:var(--sky);background:var(--soft)}
+.portrait{position:relative;display:block;cursor:pointer;border-radius:12px;overflow:hidden}
+.portrait canvas{display:block;width:100%;height:auto;aspect-ratio:300/360;max-width:100%}
+.portrait .tag{position:absolute;left:50%;bottom:6px;transform:translateX(-50%);white-space:nowrap;font-size:11.5px;font-weight:800;background:var(--ink);color:var(--bg);border-radius:99px;padding:3px 10px;pointer-events:none}
+.file{position:relative;overflow:hidden}
+.file input,.portrait input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:200px}
+.card input[type=text]{font-family:var(--display);font-weight:700;font-size:17px;text-align:center;border:0;border-bottom:2px dashed var(--line);background:transparent;color:var(--ink);padding:2px 0;width:100%;min-width:0}
+.card .x{position:absolute;top:6px;right:6px;width:28px;height:28px;border-radius:50%;border:0;background:var(--soft);color:var(--muted);font-weight:800;cursor:pointer;z-index:2}
+.paste{min-height:40px;border:2px dashed var(--line);border-radius:12px;font-size:12px;font-weight:800;color:var(--muted);padding:6px;text-align:center;line-height:1.3;overflow:hidden;cursor:text;-webkit-user-select:text;user-select:text}
+.paste:empty::before{content:"📋 长按这里粘贴照片 · Long-press to paste a photo"}
+.paste img{max-width:40px;max-height:40px}
+.help{background:var(--sun);color:#1E2A45;border-radius:14px;padding:10px 12px;font-size:13px;font-weight:700;margin:0}
+.help b{font-family:var(--display);font-size:15px}
+.addcard{border:2px dashed var(--line);border-radius:18px;background:transparent;color:var(--muted);font-family:var(--display);font-weight:800;font-size:17px;cursor:pointer;min-height:160px}
+.row{display:flex;gap:6px;flex-wrap:wrap}
+.btn{font-family:var(--body);font-weight:800;font-size:13px;border:0;border-radius:12px;padding:9px 10px;cursor:pointer;background:var(--soft);color:var(--ink);text-align:center;flex:1;line-height:1.2;display:block}
+.btn.primary{background:var(--tomato);color:#fff}
+.btn.go{background:var(--grass);color:#fff}
+.btn.blue{background:var(--sky);color:#fff}
+.btn.big{font-family:var(--display);font-size:18px;padding:12px}
+.btn[aria-pressed="false"]{opacity:.6}
+.scenebar{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.scenebar button{font-weight:800;font-size:12.5px;border:2px solid var(--line);background:var(--paper);color:var(--ink);border-radius:12px;padding:6px 2px;cursor:pointer;line-height:1.2}
+.scenebar button[aria-pressed="true"]{border-color:var(--sky);background:var(--sky);color:#fff}
+.gamebox{border-radius:18px;overflow:hidden;border:3px solid var(--ink);background:var(--ink);line-height:0}
+#game{width:100%;height:auto;aspect-ratio:800/560;max-width:100%;display:block;touch-action:none;cursor:pointer}
+.toast{min-height:22px;font-weight:800;font-size:13.5px;text-align:center;color:var(--ink)}
+.who{display:flex;gap:8px;align-items:center;overflow-x:auto;padding-bottom:2px}
+.who span{font-size:12px;font-weight:800;color:var(--muted);flex:none;line-height:1.2}
+.chip{flex:none;display:flex;flex-direction:column;align-items:center;gap:2px;border:3px solid transparent;background:var(--paper);border-radius:14px;padding:4px 6px;cursor:pointer;color:var(--ink);font-weight:800;font-size:11px}
+.chip canvas{width:44px;height:44px}
+.chip[aria-pressed="true"]{border-color:var(--sun)}
+.scenes{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.scenes button{font-weight:800;font-size:13px;border:2px solid var(--line);background:var(--paper);color:var(--ink);border-radius:12px;padding:8px 4px;cursor:pointer;line-height:1.2}
+.scenes button[aria-pressed="true"]{border-color:var(--sky);background:var(--soft)}
+.field{display:flex;flex-direction:column;gap:4px;font-weight:800;font-size:13px;color:var(--muted)}
+.field input{font-family:var(--display);font-size:17px;font-weight:700;border:2px solid var(--line);border-radius:12px;padding:8px 10px;background:var(--paper);color:var(--ink);min-width:0}
+#posterImg{width:100%;max-width:520px;border-radius:16px;border:2px solid var(--line);aspect-ratio:4/5;display:block;background:var(--soft)}
+.modal{position:fixed;inset:0;z-index:20;background:rgba(10,16,30,.62);display:flex;align-items:center;justify-content:center;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-bottom,0px))}
+.sheet{background:var(--paper);border-radius:20px;padding:16px;width:100%;max-width:380px;max-height:100%;overflow:auto;display:flex;flex-direction:column;gap:10px}
+.sheet canvas.ed{width:100%;max-width:100%;aspect-ratio:1;touch-action:none;border-radius:14px;cursor:grab;background:var(--soft)}
+.sheet input[type=range]{width:100%}
+.progress{display:flex;justify-content:space-between;align-items:center;font-weight:800;font-size:13px;color:var(--muted)}
+.stars{font-size:18px;letter-spacing:2px;color:var(--sun)}
+.asker{display:flex;gap:10px;align-items:flex-end}
+.asker canvas{width:96px;height:115px;flex:none}
+.bubble{position:relative;background:var(--soft);border-radius:16px;padding:10px 12px;flex:1;min-width:0;margin-bottom:18px}
+.bubble::before{content:"";position:absolute;left:-8px;bottom:14px;border:8px solid transparent;border-right-color:var(--soft);border-left:0}
+.bubble .whoq{font-size:12px;font-weight:800;color:var(--muted)}
+.bubble .qz{font-family:var(--display);font-weight:800;font-size:21px;line-height:1.2}
+.bubble .qe{font-size:13.5px;color:var(--muted)}
+.opts{display:grid;gap:8px}
+.pickrow{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.pickrow.three{grid-template-columns:repeat(3,1fr)}
+.pickrow button{font-family:var(--display);font-weight:800;font-size:17px;line-height:1.15;border:2px solid var(--line);background:var(--paper);color:var(--ink);border-radius:14px;padding:10px 4px;cursor:pointer}
+.pickrow button[aria-pressed="true"]{background:var(--sky);border-color:var(--sky);color:#fff}
+.bubble .qz{white-space:pre-line}
+#jumpBtn{background:var(--sun);color:#1E2A45}
+.opt{font-family:var(--display);font-weight:700;font-size:19px;border:2px solid var(--line);background:var(--paper);color:var(--ink);border-radius:14px;padding:9px 12px;cursor:pointer;text-align:left}
+.opt.right{background:var(--grass);border-color:var(--grass);color:#fff}
+.opt.wrong{background:var(--tomato);border-color:var(--tomato);color:#fff}
+.feedback{min-height:24px;font-family:var(--display);font-weight:800;font-size:18px;text-align:center}
+.hop{animation:hop .5s ease}
+@keyframes hop{0%,100%{transform:translateY(0)}40%{transform:translateY(-14px)}}
+@media (prefers-reduced-motion:reduce){.hop{animation:none}}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>全家变<span>卡通</span> · Family Toon Party</h1>
+    <p>原型试玩版 v2 · Prototype v2</p>
+  </header>
+
+  <nav aria-label="Screens">
+    <button id="tab-team" aria-pressed="true">① 角色<small>Characters</small></button>
+    <button id="tab-town" aria-pressed="false">② 小镇<small>Town</small></button>
+    <button id="tab-poster" aria-pressed="false">③ 海报<small>Poster</small></button>
+  </nav>
+
+  <!-- CHARACTERS -->
+  <section id="screen-team">
+    <h2>上传照片，变成卡通角色<small>Upload photos to make cartoon characters</small></h2>
+    <label class="btn blue big file" for="multiFile">📷 一次上传多张照片 · Upload several photos
+      <input type="file" accept="image/*" multiple id="multiFile">
+    </label>
+    <p class="help"><b>点了没反应？If nothing opens:</b><br>① 在相册里打开照片 → 分享 → 复制 (Copy)，再到下面角色卡里长按“粘贴照片”的框 → 粘贴。<br>Open the photo in your Photos app → Share → Copy, then long-press the paste box on a card below → Paste.<br>② 或者用手机的 Safari / Chrome 打开这个页面，上传按钮就能用。<br>Or open this page in Safari or Chrome on your phone, where the upload buttons work.</p>
+    <p class="msg" id="teamMsg" hidden></p>
+    <div class="grid" id="team"></div>
+    <p class="note">点角色图片就能换照片，点 ✂️ 可以把脸对准圆圈。也可以把照片拖到卡片上。<br>Tap a character to change its photo, and tap ✂️ to fit the face in the circle. You can also drag a photo onto a card.<br>🔒 照片只在这台设备里处理，不会上传。Photos stay on this device and are never uploaded.</p>
+    <button class="btn go big" id="enterTown">进入小镇 · Enter the town →</button>
+  </section>
+
+  <!-- TOWN -->
+  <section id="screen-town" hidden>
+    <div class="scenebar" id="scenebar">
+      <button data-go="map">🗺️ 地图<br>Map</button>
+      <button data-go="school">🏫 学校<br>School</button>
+      <button data-go="home">🏠 客厅<br>Living room</button>
+      <button data-go="bedroom">🛏️ 卧室<br>Bedroom</button>
+    </div>
+    <div class="gamebox"><canvas id="game" width="1600" height="1120" aria-label="Family town game"></canvas></div>
+    <div class="toast" id="toast" aria-live="polite">点地面走路，点东西互动 · Tap the floor to walk, tap things to use them</div>
+    <div class="who" id="who"><span>控制<br>Playing as</span></div>
+    <div class="row">
+      <button class="btn" id="gather">👨‍👩‍👧 全家集合<br>Gather</button>
+      <button class="btn" id="autoWalk" aria-pressed="true">🚶 自动走动<br>Auto-walk</button>
+      <button class="btn" id="labels" aria-pressed="true">🏷️ 显示标签<br>Labels</button>
+    </div>
+    <button class="btn big" id="jumpBtn">🤸 跳床游戏 · Bed jump game</button>
+    <p class="note">按住人物可以拖着走。学校黑板 = 闯关；卧室：上床睡觉、开关灯、玩具箱；客厅：沙发、电视、厕所门。<br>跳床游戏：你控制的角色在床上跳，点屏幕跳下去，家人在床边接住后会举起来转一圈。<br>Bed jump: your character bounces on the bed. Tap the screen to jump, and a family member catches you and spins you around.<br>Hold a character to drag it. School blackboard = quiz. Bedroom: beds, lamp, toy box. Living room: sofa, TV, toilet door.</p>
+  </section>
+
+  <!-- POSTER -->
+  <section id="screen-poster" hidden>
+    <h2>全家福海报<small>Family poster</small></h2>
+    <div class="scenes" id="scenes">
+      <button data-s="park" aria-pressed="true">🌳 公园<br>Park</button>
+      <button data-s="beach" aria-pressed="false">🏖️ 海边<br>Beach</button>
+      <button data-s="space" aria-pressed="false">🚀 太空<br>Space</button>
+    </div>
+    <label class="field" for="posterTitle">海报标题 · Poster title
+      <input id="posterTitle" type="text" value="我们这一家 Our Family" maxlength="24">
+    </label>
+    <img id="posterImg" alt="Family poster with cartoon characters">
+    <p class="note">长按图片即可保存到相册或分享到 WhatsApp。<br>Long-press the image to save it or share it to WhatsApp.</p>
+  </section>
+</div>
+
+<!-- face editor -->
+<div class="modal" id="edModal" hidden>
+  <div class="sheet">
+    <h2>调整头像<small>Drag to move, pinch or slide to zoom</small></h2>
+    <canvas class="ed" id="edCv" width="520" height="520"></canvas>
+    <label class="field" for="zoom">缩放 · Zoom<input id="zoom" type="range" min="0.6" max="4" step="0.01" value="1.2"></label>
+    <div class="row"><button class="btn" id="edRotate">↻ 旋转 Rotate</button><button class="btn" id="edRemove">移除 Remove</button><button class="btn go" id="edDone">完成 Done</button></div>
+  </div>
+</div>
+
+<!-- quiz -->
+<div class="modal" id="quizModal" hidden>
+  <div class="sheet">
+    <div id="quizPick" style="display:flex;flex-direction:column;gap:10px">
+      <h2>学校闯关<small>School quiz — choose a subject and age</small></h2>
+      <div class="pickrow" id="pickSub"><button data-v="eng">🔤 英文<br>English</button><button data-v="math">🔢 数学<br>Math</button></div>
+      <div class="pickrow three" id="pickAge"><button data-v="5-6">5–6 岁<br>years</button><button data-v="7-8">7–8 岁<br>years</button><button data-v="9-10">9–10 岁<br>years</button></div>
+      <p class="note" id="pickInfo"></p>
+      <button class="btn go big" id="qStart">开始 · Start →</button>
+      <button class="btn" id="qPickClose">回教室 · Back to class</button>
+    </div>
+    <div id="quizStage" hidden style="display:flex;flex-direction:column;gap:10px">
+      <div class="progress"><span id="qNum"></span><span class="stars" id="qStars"></span></div>
+      <div class="asker">
+        <canvas id="askerCv" width="192" height="230"></canvas>
+        <div class="bubble"><div class="whoq" id="qWho"></div><div class="qz" id="qZh"></div><div class="qe" id="qEn"></div></div>
+      </div>
+      <div class="opts" id="qOpts"></div>
+      <div class="feedback" id="qFb" aria-live="polite"></div>
+      <button class="btn" id="qQuit">退出 · Leave quiz</button>
+    </div>
+    <div id="quizDone" hidden style="display:flex;flex-direction:column;gap:10px">
+      <h2 id="doneTitle"></h2>
+      <div class="feedback" id="doneText"></div>
+      <div class="row"><button class="btn primary big" id="qAgain">再玩 · Again</button><button class="btn go big" id="qNext">换题目 · Change</button></div>
+      <button class="btn" id="qClose">回教室 · Back to class</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =================== members =================== */
+const PRESETS={
+  dad:{name:'爸爸 Papa',color:'#2F7DE1',hair:'#3A2A20',skin:'#F2C59B',scale:1,acc:'tie'},
+  mum:{name:'妈妈 Mama',color:'#E9568B',hair:'#5A2E1C',skin:'#F6CDA6',scale:.95,acc:'bow'},
+  kid:{name:'宝贝 Kiddo',color:'#FFB020',hair:'#5B3A24',skin:'#F9D5B0',scale:.72,acc:'hat'},
+  friend:{name:'朋友 Friend',color:'#36A866',hair:'#262626',skin:'#D9A37A',scale:.8,acc:'star'},
+  grandpa:{name:'爷爷 Grandpa',color:'#8E5CD9',hair:'#C9C9C9',skin:'#F0C49A',scale:.97,acc:'glasses'},
+  grandma:{name:'奶奶 Grandma',color:'#14A3A3',hair:'#DADADA',skin:'#F5CBA7',scale:.92,acc:'bun'}
+};
+const KEY='familyToon.v2';
+let members=[];
+function mk(p,extra={}){return Object.assign({id:p+Math.random().toString(36).slice(2,6),preset:p,face:null,faceURL:null,src:null,crop:{z:1.15,ox:0,oy:-.04,rot:0}},PRESETS[p],extra);}
+const FD='"Baloo 2","PingFang SC","Noto Sans SC","Microsoft YaHei",sans-serif', FB='"Nunito","PingFang SC","Noto Sans SC","Microsoft YaHei",sans-serif';
+
+/* =================== drawing primitives =================== */
+function rr(ctx,x,y,w,h,r){r=Math.min(r,w/2,h/2);ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
+function star(ctx,x,y,r,c){ctx.fillStyle=c;ctx.beginPath();for(let i=0;i<10;i++){const a=-Math.PI/2+i*Math.PI/5,q=i%2?r*.45:r;ctx.lineTo(x+Math.cos(a)*q,y+Math.sin(a)*q);}ctx.closePath();ctx.fill();}
+function circ(ctx,x,y,r,c){ctx.fillStyle=c;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();}
+function drawFace(ctx,cx,cy,r,m){
+  ctx.save();ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.clip();
+  if(m.face){ctx.drawImage(m.face,cx-r,cy-r,2*r,2*r);}
+  else{
+    ctx.fillStyle=m.skin;ctx.fillRect(cx-r,cy-r,2*r,2*r);
+    ctx.fillStyle=m.hair;ctx.beginPath();ctx.ellipse(cx,cy-r*.62,r*1.15,r*.68,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#1E2A45';[-1,1].forEach(k=>{ctx.beginPath();ctx.arc(cx+k*r*.36,cy+r*.08,r*.1,0,Math.PI*2);ctx.fill();});
+    ctx.fillStyle='rgba(240,96,60,.35)';[-1,1].forEach(k=>{ctx.beginPath();ctx.ellipse(cx+k*r*.58,cy+r*.36,r*.16,r*.1,0,0,Math.PI*2);ctx.fill();});
+    ctx.strokeStyle='#1E2A45';ctx.lineWidth=r*.08;ctx.lineCap='round';ctx.beginPath();ctx.arc(cx,cy+r*.28,r*.28,.15*Math.PI,.85*Math.PI);ctx.stroke();
+    if(m.acc==='glasses'){ctx.lineWidth=r*.07;[-1,1].forEach(k=>{ctx.beginPath();ctx.arc(cx+k*r*.36,cy+r*.08,r*.22,0,Math.PI*2);ctx.stroke();});ctx.beginPath();ctx.moveTo(cx-r*.14,cy+r*.08);ctx.lineTo(cx+r*.14,cy+r*.08);ctx.stroke();}
+  }
+  ctx.restore();
+  ctx.lineWidth=Math.max(1.5,r*.1);ctx.strokeStyle='#fff';ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.stroke();
+  ctx.lineWidth=Math.max(1,r*.04);ctx.strokeStyle='#1E2A45';ctx.beginPath();ctx.arc(cx,cy,r*1.05,0,Math.PI*2);ctx.stroke();
+}
+/* character: pose idle|walk|wave|cheer|play|sit|dangle */
+function drawChar(ctx,m,cx,baseY,h,o={}){
+  const pose=o.pose||'idle',ph=o.phase||0,ink='#1E2A45',hr=h*.25;
+  let bob=0,lL=0,lR=0,aL=.3,aR=.3,drop=0;
+  if(pose==='walk'){bob=Math.abs(Math.sin(ph))*h*.035;lL=Math.max(0,Math.sin(ph))*h*.06;lR=Math.max(0,-Math.sin(ph))*h*.06;aL=.3+Math.sin(ph)*.35;aR=.3-Math.sin(ph)*.35;}
+  else if(pose==='wave'){aR=2.5+Math.sin(ph*2.2)*.35;}
+  else if(pose==='cheer'||pose==='play'){bob=Math.abs(Math.sin(ph*1.6))*h*.07;aL=2.6+Math.sin(ph*3)*.25;aR=2.6-Math.sin(ph*3)*.25;}
+  else if(pose==='dangle'){aL=1.5+Math.sin(ph*1.5)*.2;aR=1.5-Math.sin(ph*1.5)*.2;}
+  else if(pose==='sit'){drop=h*.12;aL=.15;aR=.15;}
+  else if(pose==='lift'){aL=2.95;aR=2.95;}
+  const hy=baseY-h+drop-bob+hr, tTop=hy+hr*.82, tH=h*.3, tW=hr*1.6, tBot=tTop+tH, footY=baseY-h*.03;
+  ctx.lineCap='round';ctx.strokeStyle=ink;ctx.lineWidth=hr*.34;
+  [[-1,lL],[1,lR]].forEach(([k,l])=>{const hx=cx+k*tW*.24,fx=cx+k*tW*(pose==='sit'?.42:.28),fy=footY-l;
+    ctx.beginPath();ctx.moveTo(hx,tBot-hr*.1);ctx.lineTo(fx,fy);ctx.stroke();
+    ctx.fillStyle=ink;ctx.beginPath();ctx.ellipse(fx+k*hr*.08,fy+hr*.02,hr*.3,hr*.16,0,0,Math.PI*2);ctx.fill();});
+  const sy=tTop+hr*.3,al=h*.2;ctx.strokeStyle=m.color;ctx.lineWidth=hr*.32;
+  [[-1,aL],[1,aR]].forEach(([k,a])=>{const sx=cx+k*tW*.42,ex=sx+k*Math.sin(a)*al,ey=sy+Math.cos(a)*al;
+    ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(ex,ey);ctx.stroke();circ(ctx,ex,ey,hr*.18,m.skin);});
+  ctx.fillStyle=m.color;rr(ctx,cx-tW/2,tTop,tW,tH,hr*.45);ctx.fill();
+  if(m.acc==='tie'){ctx.fillStyle='#F0603C';ctx.beginPath();ctx.moveTo(cx-hr*.12,tTop+hr*.1);ctx.lineTo(cx+hr*.12,tTop+hr*.1);ctx.lineTo(cx+hr*.16,tTop+tH*.62);ctx.lineTo(cx,tTop+tH*.8);ctx.lineTo(cx-hr*.16,tTop+tH*.62);ctx.closePath();ctx.fill();}
+  if(m.acc==='star')star(ctx,cx,tTop+tH*.5,hr*.32,'#FFC23A');
+  if(m.acc==='glasses'||m.acc==='bun'){ctx.fillStyle='rgba(255,255,255,.85)';[0,1,2].forEach(i=>circ(ctx,cx,tTop+tH*(.25+i*.25),hr*.07,'rgba(255,255,255,.85)'));}
+  if(m.acc==='bun')circ(ctx,cx,hy-hr*1.05,hr*.38,m.hair);
+  drawFace(ctx,cx,hy,hr,m);
+  if(m.acc==='bow'){ctx.fillStyle='#FF8FB8';const bx=cx+hr*.7,by=hy-hr*.75;
+    ctx.beginPath();ctx.moveTo(bx,by);ctx.lineTo(bx-hr*.42,by-hr*.25);ctx.lineTo(bx-hr*.42,by+hr*.25);ctx.closePath();ctx.fill();
+    ctx.beginPath();ctx.moveTo(bx,by);ctx.lineTo(bx+hr*.42,by-hr*.25);ctx.lineTo(bx+hr*.42,by+hr*.25);ctx.closePath();ctx.fill();circ(ctx,bx,by,hr*.12,'#E9568B');}
+  if(m.acc==='hat'){ctx.fillStyle='#F0603C';ctx.beginPath();ctx.moveTo(cx-hr*.45,hy-hr*.88);ctx.lineTo(cx+hr*.45,hy-hr*.88);ctx.lineTo(cx+hr*.05,hy-hr*1.85);ctx.closePath();ctx.fill();circ(ctx,cx+hr*.05,hy-hr*1.88,hr*.15,'#FFC23A');}
+}
+
+/* =================== photo loading =================== */
+const teamMsg=document.getElementById('teamMsg');
+function setMsg(t,err){teamMsg.hidden=!t;teamMsg.textContent=t||'';teamMsg.className='msg'+(err?' err':'');}
+function toCanvas(img,w,h){const max=1000,s=Math.min(1,max/Math.max(w,h));const c=document.createElement('canvas');c.width=Math.max(1,Math.round(w*s));c.height=Math.max(1,Math.round(h*s));c.getContext('2d').drawImage(img,0,0,c.width,c.height);return c;}
+function viaImage(url){return new Promise((res,rej)=>{const im=new Image();im.onload=()=>res(toCanvas(im,im.naturalWidth,im.naturalHeight));im.onerror=rej;im.src=url;});}
+async function decode(file){
+  let u=null;
+  try{u=URL.createObjectURL(file);const c=await viaImage(u);URL.revokeObjectURL(u);return c;}catch(e){if(u)URL.revokeObjectURL(u);}
+  try{if(window.createImageBitmap){const b=await createImageBitmap(file);return toCanvas(b,b.width,b.height);}}catch(e){}
+  try{const d=await new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>res(fr.result);fr.onerror=rej;fr.readAsDataURL(file);});return await viaImage(d);}catch(e){}
+  return null;
+}
+const BAD='这张照片打不开（可能是 HEIC 格式）。请换一张 JPG / PNG，或者先截图再上传。This photo could not be opened (it may be HEIC). Please try a JPG or PNG, or upload a screenshot of it.';
+async function loadPhoto(m,file,openEd=true){
+  if(!file)return false;
+  if(file.type&&!file.type.startsWith('image/')){setMsg('请选择图片文件 · Please choose an image file.',true);return false;}
+  const src=await decode(file);
+  if(!src){setMsg(BAD,true);return false;}
+  m.src=src;m.crop={z:1.15,ox:0,oy:-.04};
+  if(openEd)openEditor(m);else{bakeFace(m);}
+  return true;
+}
+function cropCanvas(m,size){
+  const c=document.createElement('canvas');c.width=c.height=size;const x=c.getContext('2d');
+  const s=m.src,d=size,k=d/Math.min(s.width,s.height)*m.crop.z,dw=s.width*k,dh=s.height*k;
+  x.fillStyle='#ddd';x.fillRect(0,0,d,d);x.drawImage(s,d/2-dw/2+m.crop.ox*d,d/2-dh/2+m.crop.oy*d,dw,dh);return c;
+}
+function bakeFace(m){m.face=cropCanvas(m,256);try{m.faceURL=m.face.toDataURL('image/jpeg',.85);}catch(e){m.faceURL=null;}save();refreshAll();}
+
+/* =================== characters screen =================== */
+const teamEl=document.getElementById('team');
+function renderTeam(){
+  teamEl.innerHTML='';
+  members.forEach(m=>{
+    const card=document.createElement('div');card.className='card';
+    card.innerHTML=`${members.length>1?`<button class="x" aria-label="Remove">✕</button>`:''}
+      <label class="portrait"><canvas width="300" height="360"></canvas><span class="tag">📷 ${m.face?'换照片 Change':'点我上传 Tap to upload'}</span><input type="file" accept="image/*" id="pf-${m.id}"></label>
+      <input type="text" id="name-${m.id}" aria-label="Name">
+      <div class="row"><label class="btn primary file" for="file-${m.id}">📷 上传<input type="file" accept="image/*" id="file-${m.id}"></label>
+      ${m.src||m.face?`<button class="btn" data-adj="1">✂️ 调整</button>`:''}</div>
+      <div class="paste" contenteditable="true" role="textbox" aria-label="Paste photo" id="paste-${m.id}"></div>`;
+    const pz=card.querySelector('.paste');
+    pz.addEventListener('paste',e=>{e.stopPropagation();const it=[...(e.clipboardData?.items||[])].find(i=>i.type.startsWith('image/'));
+      if(it){e.preventDefault();pz.blur();loadPhoto(m,it.getAsFile());return;}
+      setTimeout(()=>{const im=pz.querySelector('img');pz.innerHTML='';pz.blur();
+        if(im&&im.src){viaImage(im.src).then(c=>{m.src=c;m.crop={z:1.15,ox:0,oy:-.04};openEditor(m);}).catch(()=>setMsg(BAD,true));}
+        else setMsg('没有粘贴到照片。请先在相册里“复制”照片，再长按这里选“粘贴”。No photo was pasted. Copy the photo in your Photos app first, then long-press here and choose Paste.',true);},60);});
+    pz.addEventListener('input',()=>{if(!pz.querySelector('img'))pz.textContent='';});
+    teamEl.appendChild(card);
+    const nm=card.querySelector('input[type=text]');nm.value=m.name;
+    nm.addEventListener('input',()=>{m.name=nm.value.trim()||PRESETS[m.preset].name;save();buildChips();});
+    const cv=card.querySelector('canvas'),ctx=cv.getContext('2d');
+    ctx.fillStyle='#EAF4FC';ctx.fillRect(0,0,300,360);ctx.fillStyle='#D3E6F5';ctx.beginPath();ctx.ellipse(150,348,90,14,0,0,Math.PI*2);ctx.fill();
+    drawChar(ctx,m,150,345,320*Math.max(m.scale,.72),{pose:'wave'});
+    card.querySelectorAll('input[type=file]').forEach(inp=>inp.addEventListener('change',e=>{const f=e.target.files[0];e.target.value='';setMsg('');loadPhoto(m,f);}));
+    const adj=card.querySelector('[data-adj]');if(adj)adj.onclick=()=>{if(!m.src&&m.face){m.src=m.face;m.crop={z:1,ox:0,oy:0};}openEditor(m);};
+    const x=card.querySelector('.x');if(x)x.onclick=()=>{members=members.filter(q=>q!==m);save();refreshAll();};
+    card.addEventListener('dragover',e=>{e.preventDefault();card.classList.add('drop');});
+    card.addEventListener('dragleave',()=>card.classList.remove('drop'));
+    card.addEventListener('drop',e=>{e.preventDefault();card.classList.remove('drop');const f=e.dataTransfer.files[0];if(f)loadPhoto(m,f);});
+  });
+  const unused=Object.keys(PRESETS).filter(p=>!members.some(m=>m.preset===p));
+  if(unused.length&&members.length<6){
+    const b=document.createElement('button');b.className='addcard';b.innerHTML=`＋ 添加成员<br><small>Add ${PRESETS[unused[0]].name}</small>`;
+    b.onclick=()=>{members.push(mk(unused[0]));save();refreshAll();};teamEl.appendChild(b);
+  }
+}
+document.getElementById('multiFile').addEventListener('change',async e=>{
+  const files=[...e.target.files];e.target.value='';if(!files.length)return;setMsg('');
+  const order=[...members.filter(m=>!m.face),...members.filter(m=>m.face)];
+  let ok=0,bad=0;
+  for(let i=0;i<files.length&&i<order.length;i++){(await loadPhoto(order[i],files[i],false))?ok++:bad++;}
+  if(files.length>order.length)setMsg(`最多放 ${order.length} 张，可以先“添加成员”。Only ${order.length} characters — add a member for more photos.`,true);
+  else if(bad)setMsg(BAD,true);
+  else setMsg(`已放好 ${ok} 张照片 ✅ 点 ✂️ 可以把脸对准。Added ${ok} photo${ok>1?'s':''}. Tap ✂️ to fit each face.`);
+});
+document.addEventListener('paste',e=>{const it=[...(e.clipboardData?.items||[])].find(i=>i.type.startsWith('image/'));if(!it)return;const m=members.find(q=>!q.face)||members[0];loadPhoto(m,it.getAsFile());});
+
+/* =================== face editor =================== */
+const edModal=document.getElementById('edModal'),edCv=document.getElementById('edCv'),edCtx=edCv.getContext('2d'),zoom=document.getElementById('zoom');
+let edM=null;const ptrs=new Map();let pinch=null;
+function drawEditor(){
+  const W=520,r=190,d=2*r,m=edM,s=m.src,k=d/Math.min(s.width,s.height)*m.crop.z,dw=s.width*k,dh=s.height*k;
+  edCtx.fillStyle='#ccd';edCtx.fillRect(0,0,W,W);
+  edCtx.drawImage(s,W/2-dw/2+m.crop.ox*d,W/2-dh/2+m.crop.oy*d,dw,dh);
+  edCtx.fillStyle='rgba(10,16,30,.55)';edCtx.beginPath();edCtx.rect(0,0,W,W);edCtx.arc(W/2,W/2,r,0,Math.PI*2,true);edCtx.fill();
+  edCtx.strokeStyle='#fff';edCtx.lineWidth=5;edCtx.beginPath();edCtx.arc(W/2,W/2,r,0,Math.PI*2);edCtx.stroke();
+}
+function openEditor(m){edM=m;zoom.value=m.crop.z;edModal.hidden=false;drawEditor();}
+zoom.oninput=()=>{edM.crop.z=+zoom.value;drawEditor();};
+edCv.addEventListener('pointerdown',e=>{edCv.setPointerCapture(e.pointerId);ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});if(ptrs.size===2){const [a,b]=[...ptrs.values()];pinch={d:Math.hypot(a.x-b.x,a.y-b.y),z:edM.crop.z};}});
+edCv.addEventListener('pointermove',e=>{if(!ptrs.has(e.pointerId))return;const p=ptrs.get(e.pointerId);
+  if(ptrs.size===1){const k=edCv.getBoundingClientRect().width/520*380;edM.crop.ox+=(e.clientX-p.x)/k;edM.crop.oy+=(e.clientY-p.y)/k;}
+  ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(ptrs.size===2&&pinch){const [a,b]=[...ptrs.values()];edM.crop.z=Math.min(4,Math.max(.6,pinch.z*Math.hypot(a.x-b.x,a.y-b.y)/pinch.d));zoom.value=edM.crop.z;}
+  drawEditor();});
+['pointerup','pointercancel'].forEach(t=>edCv.addEventListener(t,e=>{ptrs.delete(e.pointerId);pinch=null;}));
+document.getElementById('edRotate').onclick=()=>{const s=edM.src,c=document.createElement('canvas');c.width=s.height;c.height=s.width;const x=c.getContext('2d');x.translate(c.width,0);x.rotate(Math.PI/2);x.drawImage(s,0,0);edM.src=c;drawEditor();};
+document.getElementById('edDone').onclick=()=>{edModal.hidden=true;bakeFace(edM);};
+document.getElementById('edRemove').onclick=()=>{edM.face=null;edM.faceURL=null;edM.src=null;edModal.hidden=true;save();refreshAll();};
+
+/* =================== town world =================== */
+const W=800,H=560,game=document.getElementById('game'),g=game.getContext('2d');
+const BANK={"math":{"5-6":[{"zh":"3 + 2 = ?","en":"What is 3 + 2?","o":["5","15","6"],"a":0},{"zh":"2 + 4 = ?","en":"What is 2 + 4?","o":["5","6","7"],"a":1},{"zh":"8 + 2 = ?","en":"What is 8 + 2?","o":["10","20","0"],"a":0},{"zh":"6 + 3 = ?","en":"What is 6 + 3?","o":["10","9","12"],"a":1},{"zh":"2 + 5 = ?","en":"What is 2 + 5?","o":["7","6","9"],"a":0},{"zh":"3 + 5 = ?","en":"What is 3 + 5?","o":["8","10","11"],"a":0},{"zh":"5 + 2 = ?","en":"What is 5 + 2?","o":["12","6","7"],"a":2},{"zh":"1 + 5 = ?","en":"What is 1 + 5?","o":["9","5","6"],"a":2},{"zh":"8 + 1 = ?","en":"What is 8 + 1?","o":["9","14","19"],"a":0},{"zh":"5 + 3 = ?","en":"What is 5 + 3?","o":["9","8","6"],"a":1},{"zh":"1 + 7 = ?","en":"What is 1 + 7?","o":["8","18","6"],"a":0},{"zh":"1 + 3 = ?","en":"What is 1 + 3?","o":["4","3","6"],"a":0},{"zh":"4 + 1 = ?","en":"What is 4 + 1?","o":["7","5","15"],"a":1},{"zh":"3 + 6 = ?","en":"What is 3 + 6?","o":["9","10","8"],"a":0},{"zh":"1 + 4 = ?","en":"What is 1 + 4?","o":["6","5","3"],"a":1},{"zh":"3 + 3 = ?","en":"What is 3 + 3?","o":["6","11","4"],"a":0},{"zh":"2 + 7 = ?","en":"What is 2 + 7?","o":["19","14","9"],"a":2},{"zh":"1 + 8 = ?","en":"What is 1 + 8?","o":["11","9","10"],"a":1},{"zh":"1 + 1 = ?","en":"What is 1 + 1?","o":["2","0","4"],"a":0},{"zh":"4 + 6 = ?","en":"What is 4 + 6?","o":["0","12","10"],"a":2},{"zh":"3 + 7 = ?","en":"What is 3 + 7?","o":["15","10","11"],"a":1},{"zh":"4 + 2 = ?","en":"What is 4 + 2?","o":["9","6","16"],"a":1},{"zh":"4 − 1 = ?","en":"What is 4 minus 1?","o":["5","6","3"],"a":2},{"zh":"9 − 8 = ?","en":"What is 9 minus 8?","o":["1","4","0"],"a":0},{"zh":"7 − 6 = ?","en":"What is 7 minus 6?","o":["1","4","11"],"a":0},{"zh":"3 − 1 = ?","en":"What is 3 minus 1?","o":["2","4","0"],"a":0},{"zh":"10 − 7 = ?","en":"What is 10 minus 7?","o":["4","3","2"],"a":1},{"zh":"8 − 1 = ?","en":"What is 8 minus 1?","o":["7","6","9"],"a":0},{"zh":"6 − 1 = ?","en":"What is 6 minus 1?","o":["5","8","15"],"a":0},{"zh":"10 − 6 = ?","en":"What is 10 minus 6?","o":["9","5","4"],"a":2},{"zh":"10 − 5 = ?","en":"What is 10 minus 5?","o":["4","8","5"],"a":2},{"zh":"5 − 4 = ?","en":"What is 5 minus 4?","o":["11","1","3"],"a":1},{"zh":"8 − 6 = ?","en":"What is 8 minus 6?","o":["4","2","5"],"a":1},{"zh":"10 − 2 = ?","en":"What is 10 minus 2?","o":["8","9","13"],"a":0},{"zh":"4 − 3 = ?","en":"What is 4 minus 3?","o":["4","2","1"],"a":2},{"zh":"10 − 9 = ?","en":"What is 10 minus 9?","o":["2","1","4"],"a":1},{"zh":"8 − 4 = ?","en":"What is 8 minus 4?","o":["14","4","5"],"a":1},{"zh":"8 − 5 = ?","en":"What is 8 minus 5?","o":["2","6","3"],"a":2},{"zh":"7 − 1 = ?","en":"What is 7 minus 1?","o":["6","7","11"],"a":0},{"zh":"7 − 5 = ?","en":"What is 7 minus 5?","o":["4","1","2"],"a":2},{"zh":"🍎🍎🍎🍎🍎🍎🍎🍎\n一共有多少苹果？","en":"How many apples are there?","o":["10","6","8"],"a":2},{"zh":"⭐⭐⭐⭐\n一共有多少星星？","en":"How many stars are there?","o":["4","3","6"],"a":0},{"zh":"🐟🐟🐟🐟🐟\n一共有多少鱼？","en":"How many fish are there?","o":["5","6","3"],"a":0},{"zh":"🎈🎈🎈🎈🎈\n一共有多少气球？","en":"How many balloons are there?","o":["3","6","5"],"a":2},{"zh":"🍌🍌🍌🍌🍌🍌🍌\n一共有多少香蕉？","en":"How many bananas are there?","o":["9","7","8"],"a":1},{"zh":"🚗🚗🚗🚗🚗🚗🚗🚗\n一共有多少车？","en":"How many cars are there?","o":["8","9","6"],"a":0},{"zh":"🍎🍎🍎🍎🍎\n一共有多少苹果？","en":"How many apples are there?","o":["3","7","5"],"a":2},{"zh":"⭐⭐⭐⭐⭐⭐⭐\n一共有多少星星？","en":"How many stars are there?","o":["9","7","6"],"a":1},{"zh":"🐟🐟🐟🐟🐟🐟\n一共有多少鱼？","en":"How many fish are there?","o":["7","6","5"],"a":1},{"zh":"🎈🎈🎈🎈\n一共有多少气球？","en":"How many balloons are there?","o":["2","3","4"],"a":2},{"zh":"3 和 6，哪个比较大？","en":"Which number is bigger: 3 or 6?","o":["6","3","7"],"a":0},{"zh":"1 和 2，哪个比较大？","en":"Which number is bigger: 1 or 2?","o":["1","2","3"],"a":1},{"zh":"20 和 17，哪个比较大？","en":"Which number is bigger: 20 or 17?","o":["21","17","20"],"a":2},{"zh":"5 和 10，哪个比较大？","en":"Which number is bigger: 5 or 10?","o":["11","10","5"],"a":1},{"zh":"11 和 15，哪个比较大？","en":"Which number is bigger: 11 or 15?","o":["11","15","16"],"a":1},{"zh":"13 和 8，哪个比较大？","en":"Which number is bigger: 13 or 8?","o":["13","8","14"],"a":0},{"zh":"2, 3, 4, ? 下一个是？","en":"What number comes next?","o":["4","5","6"],"a":1},{"zh":"5, 6, 7, ? 下一个是？","en":"What number comes next?","o":["7","8","9"],"a":1},{"zh":"7, 8, 9, ? 下一个是？","en":"What number comes next?","o":["11","10","9"],"a":1},{"zh":"11, 12, 13, ? 下一个是？","en":"What number comes next?","o":["13","14","15"],"a":1},{"zh":"14, 15, 16, ? 下一个是？","en":"What number comes next?","o":["16","18","17"],"a":2},{"zh":"2, 4, 6, ? 下一个是？","en":"Count by 2s. What comes next?","o":["8","9","10"],"a":0},{"zh":"5, 10, 15, ? 下一个是？","en":"Count by 5s. What comes next?","o":["25","20","21"],"a":1},{"zh":"10, 20, 30, ? 下一个是？","en":"Count by 10s. What comes next?","o":["50","40","41"],"a":1},{"zh":"三角形 🔺 有几条边？","en":"How many sides does a triangle have?","o":["5","3","4"],"a":1},{"zh":"正方形 🟥 有几条边？","en":"How many sides does a square have?","o":["4","3","5"],"a":0},{"zh":"圆形 ⚪ 有几个角？","en":"How many corners does a circle have?","o":["4","1","0"],"a":2},{"zh":"长方形有几个角？","en":"How many corners does a rectangle have?","o":["2","3","4"],"a":2},{"zh":"一只手有几根手指？","en":"How many fingers are on one hand?","o":["5","10","4"],"a":0},{"zh":"一个星期有几天？","en":"How many days are in a week?","o":["5","7","10"],"a":1},{"zh":"小明有 3 颗糖，妈妈再给他 2 颗。他现在有几颗？","en":"Ming has 3 sweets. Mum gives him 2 more. How many now?","o":["4","5","6"],"a":1},{"zh":"树上有 6 只鸟，飞走了 2 只。还剩几只？","en":"6 birds are in a tree. 2 fly away. How many are left?","o":["3","4","2"],"a":1},{"zh":"我有 4 个气球，破了 1 个。还剩几个？","en":"I have 4 balloons. 1 pops. How many are left?","o":["4","5","3"],"a":2},{"zh":"爸爸买了 5 个苹果，又买了 4 个。一共几个？","en":"Papa buys 5 apples, then 4 more. How many in all?","o":["8","11","9"],"a":2},{"zh":"桌上有 8 块饼干，吃掉 3 块。还剩几块？","en":"There are 8 biscuits. You eat 3. How many are left?","o":["4","5","3"],"a":1}],"7-8":[{"zh":"27 + 15 = ?","en":"What is 27 + 15?","o":["42","45","52"],"a":0},{"zh":"43 + 7 = ?","en":"What is 43 + 7?","o":["60","49","50"],"a":2},{"zh":"28 + 18 = ?","en":"What is 28 + 18?","o":["36","46","44"],"a":1},{"zh":"46 + 38 = ?","en":"What is 46 + 38?","o":["86","84","74"],"a":1},{"zh":"26 + 7 = ?","en":"What is 26 + 7?","o":["43","31","33"],"a":2},{"zh":"21 + 17 = ?","en":"What is 21 + 17?","o":["43","38","37"],"a":1},{"zh":"58 + 13 = ?","en":"What is 58 + 13?","o":["69","71","70"],"a":1},{"zh":"19 + 5 = ?","en":"What is 19 + 5?","o":["24","29","26"],"a":0},{"zh":"16 + 6 = ?","en":"What is 16 + 6?","o":["20","22","32"],"a":1},{"zh":"12 + 26 = ?","en":"What is 12 + 26?","o":["40","43","38"],"a":2},{"zh":"18 + 9 = ?","en":"What is 18 + 9?","o":["29","27","30"],"a":1},{"zh":"39 + 23 = ?","en":"What is 39 + 23?","o":["64","61","62"],"a":2},{"zh":"31 + 33 = ?","en":"What is 31 + 33?","o":["64","63","65"],"a":0},{"zh":"58 + 31 = ?","en":"What is 58 + 31?","o":["88","92","89"],"a":2},{"zh":"67 − 50 = ?","en":"What is 67 minus 50?","o":["16","17","20"],"a":1},{"zh":"72 − 46 = ?","en":"What is 72 minus 46?","o":["26","27","31"],"a":0},{"zh":"74 − 62 = ?","en":"What is 74 minus 62?","o":["17","12","2"],"a":1},{"zh":"85 − 79 = ?","en":"What is 85 minus 79?","o":["6","11","7"],"a":0},{"zh":"34 − 24 = ?","en":"What is 34 minus 24?","o":["10","11","0"],"a":0},{"zh":"74 − 54 = ?","en":"What is 74 minus 54?","o":["30","10","20"],"a":2},{"zh":"75 − 8 = ?","en":"What is 75 minus 8?","o":["66","67","68"],"a":1},{"zh":"85 − 70 = ?","en":"What is 85 minus 70?","o":["5","17","15"],"a":2},{"zh":"45 − 34 = ?","en":"What is 45 minus 34?","o":["13","11","21"],"a":1},{"zh":"42 − 9 = ?","en":"What is 42 minus 9?","o":["43","23","33"],"a":2},{"zh":"73 − 28 = ?","en":"What is 73 minus 28?","o":["43","35","45"],"a":2},{"zh":"46 − 10 = ?","en":"What is 46 minus 10?","o":["46","35","36"],"a":2},{"zh":"3 × 7 = ?","en":"What is 3 times 7?","o":["21","24","18"],"a":0},{"zh":"4 × 3 = ?","en":"What is 4 times 3?","o":["16","8","12"],"a":2},{"zh":"4 × 9 = ?","en":"What is 4 times 9?","o":["36","40","32"],"a":0},{"zh":"5 × 2 = ?","en":"What is 5 times 2?","o":["5","10","15"],"a":1},{"zh":"4 × 8 = ?","en":"What is 4 times 8?","o":["32","36","28"],"a":0},{"zh":"5 × 6 = ?","en":"What is 5 times 6?","o":["30","35","25"],"a":0},{"zh":"3 × 8 = ?","en":"What is 3 times 8?","o":["24","21","27"],"a":0},{"zh":"3 × 3 = ?","en":"What is 3 times 3?","o":["9","12","6"],"a":0},{"zh":"4 × 2 = ?","en":"What is 4 times 2?","o":["4","12","8"],"a":2},{"zh":"5 × 3 = ?","en":"What is 5 times 3?","o":["10","20","15"],"a":2},{"zh":"2 × 3 = ?","en":"What is 2 times 3?","o":["6","8","4"],"a":0},{"zh":"5 × 8 = ?","en":"What is 5 times 8?","o":["40","35","45"],"a":0},{"zh":"4 × 5 = ?","en":"What is 4 times 5?","o":["24","16","20"],"a":2},{"zh":"3 × 5 = ?","en":"What is 3 times 5?","o":["18","12","15"],"a":2},{"zh":"4 × 7 = ?","en":"What is 4 times 7?","o":["28","32","24"],"a":0},{"zh":"3 × 2 = ?","en":"What is 3 times 2?","o":["6","9","3"],"a":0},{"zh":"🕒 时钟显示几点？","en":"What time does the clock show?","o":["4 o'clock","3 o'clock","half past 3"],"a":1},{"zh":"🕖 时钟显示几点？","en":"What time does the clock show?","o":["7 o'clock","8 o'clock","half past 7"],"a":0},{"zh":"🕛 时钟显示几点？","en":"What time does the clock show?","o":["12 o'clock","half past 12","1 o'clock"],"a":0},{"zh":"🕧 短针在 12 和 1 中间，长针指 6，是几点？","en":"The short hand is between 12 and 1, the long hand is on 6. What time is it?","o":["half past 12","12 o'clock","6 o'clock"],"a":0},{"zh":"一小时有几分钟？","en":"How many minutes are in one hour?","o":["60","30","100"],"a":0},{"zh":"一天有几个小时？","en":"How many hours are in one day?","o":["12","24","60"],"a":1},{"zh":"一支笔 RM2，一本本子 RM3，一共多少钱？","en":"A pen costs RM2 and a book costs RM3. How much altogether?","o":["RM5","RM1","RM6"],"a":0},{"zh":"一支笔 RM5，一本本子 RM4，一共多少钱？","en":"A pen costs RM5 and a book costs RM4. How much altogether?","o":["RM9","RM10","RM1"],"a":0},{"zh":"一支笔 RM1，一本本子 RM7，一共多少钱？","en":"A pen costs RM1 and a book costs RM7. How much altogether?","o":["RM8","RM9","RM6"],"a":0},{"zh":"一支笔 RM10，一本本子 RM5，一共多少钱？","en":"A pen costs RM10 and a book costs RM5. How much altogether?","o":["RM15","RM16","RM5"],"a":0},{"zh":"一支笔 RM3，一本本子 RM6，一共多少钱？","en":"A pen costs RM3 and a book costs RM6. How much altogether?","o":["RM3","RM9","RM10"],"a":1},{"zh":"你给 RM10，买了 RM7 的东西，找回多少钱？","en":"You pay RM10 for something that costs RM7. How much change?","o":["RM3","RM17","RM4"],"a":0},{"zh":"你给 RM5，买了 RM2 的东西，找回多少钱？","en":"You pay RM5 for something that costs RM2. How much change?","o":["RM3","RM4","RM7"],"a":0},{"zh":"你给 RM20，买了 RM15 的东西，找回多少钱？","en":"You pay RM20 for something that costs RM15. How much change?","o":["RM5","RM35","RM6"],"a":0},{"zh":"你给 RM10，买了 RM4 的东西，找回多少钱？","en":"You pay RM10 for something that costs RM4. How much change?","o":["RM14","RM7","RM6"],"a":2},{"zh":"36 的十位数是多少？","en":"In 36, what digit is in the tens place?","o":["3","4","6"],"a":0},{"zh":"58 的十位数是多少？","en":"In 58, what digit is in the tens place?","o":["8","6","5"],"a":2},{"zh":"72 的十位数是多少？","en":"In 72, what digit is in the tens place?","o":["7","2","8"],"a":0},{"zh":"94 的十位数是多少？","en":"In 94, what digit is in the tens place?","o":["4","9","10"],"a":1},{"zh":"41 的十位数是多少？","en":"In 41, what digit is in the tens place?","o":["5","1","4"],"a":2},{"zh":"15 是单数还是双数？","en":"Is 15 odd or even?","o":["单数 Odd","都不是 Neither","双数 Even"],"a":0},{"zh":"22 是单数还是双数？","en":"Is 22 odd or even?","o":["双数 Even","都不是 Neither","单数 Odd"],"a":0},{"zh":"37 是单数还是双数？","en":"Is 37 odd or even?","o":["单数 Odd","双数 Even","都不是 Neither"],"a":0},{"zh":"48 是单数还是双数？","en":"Is 48 odd or even?","o":["单数 Odd","都不是 Neither","双数 Even"],"a":2},{"zh":"一盒有 4 个蛋糕，3 盒一共几个？","en":"One box has 4 cakes. How many cakes in 3 boxes?","o":["2","14","12"],"a":2},{"zh":"班上有 25 个学生，又来了 8 个。现在有几个？","en":"There are 25 pupils. 8 more come. How many now?","o":["23","33","32"],"a":1},{"zh":"妈妈有 40 粒榴莲种子，送出 15 粒，还剩几粒？","en":"Mama has 40 durian seeds and gives away 15. How many are left?","o":["24","25","27"],"a":1},{"zh":"每辆车有 4 个轮子，5 辆车一共几个轮子？","en":"Each car has 4 wheels. How many wheels on 5 cars?","o":["30","19","20"],"a":2},{"zh":"小华读了 18 页，今天再读 9 页，一共读了几页？","en":"Hua read 18 pages, then 9 more today. How many pages in all?","o":["27","29","17"],"a":0},{"zh":"2 只猫，每只有 4 条腿，一共几条腿？","en":"2 cats each have 4 legs. How many legs in all?","o":["18","8","10"],"a":1}],"9-10":[{"zh":"9 × 11 = ?","en":"What is 9 times 11?","o":["99","110","88"],"a":0},{"zh":"6 × 8 = ?","en":"What is 6 times 8?","o":["56","48","40"],"a":1},{"zh":"12 × 3 = ?","en":"What is 12 times 3?","o":["36","33","39"],"a":0},{"zh":"9 × 4 = ?","en":"What is 9 times 4?","o":["36","40","32"],"a":0},{"zh":"11 × 8 = ?","en":"What is 11 times 8?","o":["80","88","96"],"a":1},{"zh":"7 × 8 = ?","en":"What is 7 times 8?","o":["64","48","56"],"a":2},{"zh":"7 × 7 = ?","en":"What is 7 times 7?","o":["49","42","56"],"a":0},{"zh":"7 × 12 = ?","en":"What is 7 times 12?","o":["96","72","84"],"a":2},{"zh":"6 × 6 = ?","en":"What is 6 times 6?","o":["36","42","30"],"a":0},{"zh":"8 × 8 = ?","en":"What is 8 times 8?","o":["72","64","56"],"a":1},{"zh":"11 × 10 = ?","en":"What is 11 times 10?","o":["110","120","100"],"a":0},{"zh":"9 × 8 = ?","en":"What is 9 times 8?","o":["64","80","72"],"a":2},{"zh":"10 × 4 = ?","en":"What is 10 times 4?","o":["36","40","44"],"a":1},{"zh":"7 × 9 = ?","en":"What is 7 times 9?","o":["54","63","72"],"a":1},{"zh":"6 × 7 = ?","en":"What is 6 times 7?","o":["42","35","49"],"a":0},{"zh":"8 × 5 = ?","en":"What is 8 times 5?","o":["35","40","45"],"a":1},{"zh":"25 ÷ 5 = ?","en":"What is 25 divided by 5?","o":["4","6","5"],"a":2},{"zh":"90 ÷ 9 = ?","en":"What is 90 divided by 9?","o":["11","10","12"],"a":1},{"zh":"20 ÷ 5 = ?","en":"What is 20 divided by 5?","o":["2","5","4"],"a":2},{"zh":"63 ÷ 9 = ?","en":"What is 63 divided by 9?","o":["7","9","8"],"a":0},{"zh":"14 ÷ 7 = ?","en":"What is 14 divided by 7?","o":["2","0","4"],"a":0},{"zh":"45 ÷ 9 = ?","en":"What is 45 divided by 9?","o":["5","3","6"],"a":0},{"zh":"18 ÷ 2 = ?","en":"What is 18 divided by 2?","o":["10","9","7"],"a":1},{"zh":"50 ÷ 10 = ?","en":"What is 50 divided by 10?","o":["6","3","5"],"a":2},{"zh":"35 ÷ 5 = ?","en":"What is 35 divided by 5?","o":["6","7","9"],"a":1},{"zh":"50 ÷ 5 = ?","en":"What is 50 divided by 5?","o":["10","9","11"],"a":0},{"zh":"14 ÷ 2 = ?","en":"What is 14 divided by 2?","o":["5","7","9"],"a":1},{"zh":"9 ÷ 3 = ?","en":"What is 9 divided by 3?","o":["5","3","1"],"a":1},{"zh":"36 ÷ 9 = ?","en":"What is 36 divided by 9?","o":["4","5","3"],"a":0},{"zh":"8 ÷ 4 = ?","en":"What is 8 divided by 4?","o":["2","1","4"],"a":0},{"zh":"181 + 128 = ?","en":"What is 181 + 128?","o":["319","309","299"],"a":1},{"zh":"246 + 266 = ?","en":"What is 246 + 266?","o":["512","522","502"],"a":0},{"zh":"235 + 235 = ?","en":"What is 235 + 235?","o":["470","480","460"],"a":0},{"zh":"126 + 245 = ?","en":"What is 126 + 245?","o":["361","381","371"],"a":2},{"zh":"517 + 346 = ?","en":"What is 517 + 346?","o":["863","853","873"],"a":0},{"zh":"385 + 138 = ?","en":"What is 385 + 138?","o":["533","523","513"],"a":1},{"zh":"672 − 372 = ?","en":"What is 672 minus 372?","o":["290","300","310"],"a":1},{"zh":"583 − 300 = ?","en":"What is 583 minus 300?","o":["273","293","283"],"a":2},{"zh":"813 − 672 = ?","en":"What is 813 minus 672?","o":["151","141","131"],"a":1},{"zh":"972 − 100 = ?","en":"What is 972 minus 100?","o":["882","862","872"],"a":2},{"zh":"416 − 121 = ?","en":"What is 416 minus 121?","o":["295","305","285"],"a":0},{"zh":"534 − 109 = ?","en":"What is 534 minus 109?","o":["415","435","425"],"a":2},{"zh":"10 的一半是多少？","en":"What is 1/2 of 10?","o":["7","5","4"],"a":1},{"zh":"12 的三分之一是多少？","en":"What is 1/3 of 12?","o":["5","4","12"],"a":1},{"zh":"20 的四分之一是多少？","en":"What is 1/4 of 20?","o":["20","5","7"],"a":1},{"zh":"16 的一半是多少？","en":"What is 1/2 of 16?","o":["8","10","16"],"a":0},{"zh":"30 的五分之一是多少？","en":"What is 1/5 of 30?","o":["6","7","5"],"a":0},{"zh":"24 的四分之一是多少？","en":"What is 1/4 of 24?","o":["5","6","8"],"a":1},{"zh":"1/2 和 1/4，哪个比较大？","en":"Which is bigger, 1/2 or 1/4?","o":["一样 Same","1/2","1/4"],"a":1},{"zh":"2/4 等于多少？","en":"2/4 is the same as…","o":["1/4","2","1/2"],"a":2},{"zh":"正方形每边 4 cm，周长是多少？","en":"A square has sides of 4 cm. What is its perimeter?","o":["8 cm","12 cm","16 cm"],"a":2},{"zh":"正方形每边 6 cm，周长是多少？","en":"A square has sides of 6 cm. What is its perimeter?","o":["36 cm","12 cm","24 cm"],"a":2},{"zh":"正方形每边 9 cm，周长是多少？","en":"A square has sides of 9 cm. What is its perimeter?","o":["81 cm","18 cm","36 cm"],"a":2},{"zh":"长方形长 5 cm、宽 3 cm，面积是多少？","en":"A rectangle is 5 cm by 3 cm. What is its area?","o":["8 cm²","15 cm²","16 cm²"],"a":1},{"zh":"长方形长 8 cm、宽 2 cm，面积是多少？","en":"A rectangle is 8 cm by 2 cm. What is its area?","o":["20 cm²","16 cm²","10 cm²"],"a":1},{"zh":"长方形长 6 cm、宽 4 cm，面积是多少？","en":"A rectangle is 6 cm by 4 cm. What is its area?","o":["20 cm²","10 cm²","24 cm²"],"a":2},{"zh":"3482 的百位数是多少？","en":"In 3482, what digit is in the hundreds place?","o":["8","4","3"],"a":1},{"zh":"5071 的百位数是多少？","en":"In 5071, what digit is in the hundreds place?","o":["7","0","5"],"a":1},{"zh":"7265 的百位数是多少？","en":"In 7265, what digit is in the hundreds place?","o":["6","2","7"],"a":1},{"zh":"347 四舍五入到十位是多少？","en":"Round 347 to the nearest ten.","o":["350","360","340"],"a":0},{"zh":"1284 四舍五入到十位是多少？","en":"Round 1284 to the nearest ten.","o":["1290","1270","1280"],"a":2},{"zh":"65 四舍五入到十位是多少？","en":"Round 65 to the nearest ten.","o":["80","70","60"],"a":1},{"zh":"1 公斤 (kg) 等于多少克 (g)？","en":"1 kilogram is how many grams?","o":["100","1000","10"],"a":1},{"zh":"1 米 (m) 等于多少厘米 (cm)？","en":"1 metre is how many centimetres?","o":["10","1000","100"],"a":2},{"zh":"1 公升 (L) 等于多少毫升 (ml)？","en":"1 litre is how many millilitres?","o":["500","100","1000"],"a":2},{"zh":"一年有几个月？","en":"How many months are in a year?","o":["52","12","10"],"a":1},{"zh":"2 小时 = 多少分钟？","en":"2 hours = how many minutes?","o":["200","120","100"],"a":1},{"zh":"一本书 RM12，买 4 本要多少钱？","en":"A book costs RM12. How much for 4 books?","o":["RM44","RM16","RM48"],"a":2},{"zh":"36 颗糖平分给 4 个小朋友，每人几颗？","en":"36 sweets are shared equally by 4 children. How many each?","o":["10","9","8"],"a":1},{"zh":"一辆巴士坐 45 人，2 辆巴士坐多少人？","en":"One bus holds 45 people. How many in 2 buses?","o":["90","80","47"],"a":0},{"zh":"爸爸 38 岁，宝贝 9 岁，相差几岁？","en":"Papa is 38 and the child is 9. What is the age difference?","o":["47","29","31"],"a":1},{"zh":"每天读 15 页，一个星期读几页？","en":"Read 15 pages a day. How many pages in one week?","o":["75","105","115"],"a":1},{"zh":"RM50 买了 RM23 的东西，找回多少？","en":"You pay RM50 for RM23 of shopping. How much change?","o":["RM37","RM73","RM27"],"a":2},{"zh":"一盒 8 支笔，7 盒有几支？","en":"A box has 8 pencils. How many in 7 boxes?","o":["54","56","15"],"a":1},{"zh":"一个班 32 人，分成 4 组，每组几人？","en":"A class of 32 makes 4 equal groups. How many in each group?","o":["9","6","8"],"a":2}]},"eng":{"5-6":[{"zh":"🥛 这是什么？","en":"What is this? 🥛","o":["milk","apple","bread"],"a":0},{"zh":"⚫ 这是什么？","en":"What is this? ⚫","o":["red","black","orange"],"a":1},{"zh":"🥚 这是什么？","en":"What is this? 🥚","o":["grapes","apple","egg"],"a":2},{"zh":"🍪 这是什么？","en":"What is this? 🍪","o":["cookie","carrot","bread"],"a":0},{"zh":"🔴 这是什么？","en":"What is this? 🔴","o":["red","purple","yellow"],"a":0},{"zh":"👄 这是什么？","en":"What is this? 👄","o":["mouth","ear","hand"],"a":0},{"zh":"🦆 这是什么？","en":"What is this? 🦆","o":["elephant","chicken","duck"],"a":2},{"zh":"🌸 这是什么？","en":"What is this? 🌸","o":["tree","flower","moon"],"a":1},{"zh":"🐱 这是什么？","en":"What is this? 🐱","o":["turtle","elephant","cat"],"a":2},{"zh":"👁️ 这是什么？","en":"What is this? 👁️","o":["hand","nose","eye"],"a":2},{"zh":"✋ 这是什么？","en":"What is this? ✋","o":["hand","nose","foot"],"a":0},{"zh":"🚲 这是什么？","en":"What is this? 🚲","o":["umbrella","ball","bicycle"],"a":2},{"zh":"🌊 这是什么？","en":"What is this? 🌊","o":["sea","sun","moon"],"a":0},{"zh":"🐘 这是什么？","en":"What is this? 🐘","o":["snake","bird","elephant"],"a":2},{"zh":"🐢 这是什么？","en":"What is this? 🐢","o":["frog","dog","turtle"],"a":2},{"zh":"🐸 这是什么？","en":"What is this? 🐸","o":["monkey","rabbit","frog"],"a":2},{"zh":"🐒 这是什么？","en":"What is this? 🐒","o":["elephant","bird","monkey"],"a":2},{"zh":"🌧️ 这是什么？","en":"What is this? 🌧️","o":["rain","sun","cloud"],"a":0},{"zh":"📺 这是什么？","en":"What is this? 📺","o":["bed","pencil","television"],"a":2},{"zh":"⚪ 这是什么？","en":"What is this? ⚪","o":["orange","white","yellow"],"a":1},{"zh":"🍌 这是什么？","en":"What is this? 🍌","o":["orange","banana","rice"],"a":1},{"zh":"🚗 这是什么？","en":"What is this? 🚗","o":["lamp","watch","car"],"a":2},{"zh":"🍎 这是什么？","en":"What is this? 🍎","o":["milk","cookie","apple"],"a":2},{"zh":"🍞 这是什么？","en":"What is this? 🍞","o":["cookie","bread","apple"],"a":1},{"zh":"🐰 这是什么？","en":"What is this? 🐰","o":["rabbit","fish","frog"],"a":0},{"zh":"🍇 这是什么？","en":"What is this? 🍇","o":["cookie","orange","grapes"],"a":2},{"zh":"🐮 这是什么？","en":"What is this? 🐮","o":["cat","turtle","cow"],"a":2},{"zh":"🐯 这是什么？","en":"What is this? 🐯","o":["turtle","cat","tiger"],"a":2},{"zh":"🎒 这是什么？","en":"What is this? 🎒","o":["bed","bag","chair"],"a":1},{"zh":"⌚ 这是什么？","en":"What is this? ⌚","o":["watch","lamp","umbrella"],"a":0},{"zh":"🐟 这是什么？","en":"What is this? 🐟","o":["monkey","fish","frog"],"a":1},{"zh":"🌳 这是什么？","en":"What is this? 🌳","o":["flower","tree","sea"],"a":1},{"zh":"🟢 这是什么？","en":"What is this? 🟢","o":["green","yellow","orange"],"a":0},{"zh":"🪑 这是什么？","en":"What is this? 🪑","o":["chair","car","umbrella"],"a":0},{"zh":"👂 这是什么？","en":"What is this? 👂","o":["foot","ear","hand"],"a":1},{"zh":"🧸 这是什么？","en":"What is this? 🧸","o":["umbrella","pencil","teddy bear"],"a":2},{"zh":"🟠 这是什么？","en":"What is this? 🟠","o":["white","orange","red"],"a":1},{"zh":"🐦 这是什么？","en":"What is this? 🐦","o":["monkey","bird","turtle"],"a":1},{"zh":"🟡 这是什么？","en":"What is this? 🟡","o":["orange","purple","yellow"],"a":2},{"zh":"🦶 这是什么？","en":"What is this? 🦶","o":["nose","eye","foot"],"a":2},{"zh":"🐱 缺了哪个字母？ c_t","en":"Which letter is missing? c_t","o":["a","u","o"],"a":0},{"zh":"🐶 缺了哪个字母？ d_g","en":"Which letter is missing? d_g","o":["i","a","o"],"a":2},{"zh":"🛏️ 缺了哪个字母？ b_d","en":"Which letter is missing? b_d","o":["a","e","u"],"a":1},{"zh":"☀️ 缺了哪个字母？ s_n","en":"Which letter is missing? s_n","o":["u","i","a"],"a":0},{"zh":"🐷 缺了哪个字母？ p_g","en":"Which letter is missing? p_g","o":["i","e","a"],"a":0},{"zh":"🎩 缺了哪个字母？ h_t","en":"Which letter is missing? h_t","o":["a","o","i"],"a":0},{"zh":"🚌 缺了哪个字母？ b_s","en":"Which letter is missing? b_s","o":["u","o","a"],"a":0},{"zh":"🐟 缺了哪个字母？ f_sh","en":"Which letter is missing? f_sh","o":["a","i","u"],"a":1},{"zh":"🍎 缺了哪个字母？ _pple","en":"Which letter is missing? _pple","o":["e","o","a"],"a":2},{"zh":"🥚 缺了哪个字母？ eg_","en":"Which letter is missing? eg_","o":["d","g","k"],"a":1},{"zh":"A, B, ? 下一个字母是？","en":"What letter comes after B?","o":["A","C","E"],"a":1},{"zh":"D, E, ? 下一个字母是？","en":"What letter comes after E?","o":["D","F","H"],"a":1},{"zh":"H, I, ? 下一个字母是？","en":"What letter comes after I?","o":["L","H","J"],"a":2},{"zh":"L, M, ? 下一个字母是？","en":"What letter comes after M?","o":["P","L","N"],"a":2},{"zh":"Q, R, ? 下一个字母是？","en":"What letter comes after R?","o":["S","U","Q"],"a":0},{"zh":"U, V, ? 下一个字母是？","en":"What letter comes after V?","o":["Y","U","W"],"a":2},{"zh":"大写 A 的小写是？","en":"What is the small letter for A?","o":["o","e","a"],"a":2},{"zh":"大写 B 的小写是？","en":"What is the small letter for B?","o":["d","p","b"],"a":2},{"zh":"大写 G 的小写是？","en":"What is the small letter for G?","o":["j","g","q"],"a":1},{"zh":"大写 R 的小写是？","en":"What is the small letter for R?","o":["r","m","n"],"a":0},{"zh":"“one” 是数字几？","en":"Which number is “one”?","o":["1","0","3"],"a":0},{"zh":"“three” 是数字几？","en":"Which number is “three”?","o":["2","3","4"],"a":1},{"zh":"“five” 是数字几？","en":"Which number is “five”?","o":["6","7","5"],"a":2},{"zh":"“seven” 是数字几？","en":"Which number is “seven”?","o":["9","6","7"],"a":2},{"zh":"“nine” 是数字几？","en":"Which number is “nine”?","o":["9","11","10"],"a":0}],"7-8":[{"zh":"“电视”的英文是？","en":"What is “电视” in English?","o":["door","television","watch"],"a":1},{"zh":"“苹果”的英文是？","en":"What is “苹果” in English?","o":["bread","carrot","apple"],"a":2},{"zh":"“面包”的英文是？","en":"What is “面包” in English?","o":["cake","bread","watermelon"],"a":1},{"zh":"“门”的英文是？","en":"What is “门” in English?","o":["television","door","pencil"],"a":1},{"zh":"“大象”的英文是？","en":"What is “大象” in English?","o":["rabbit","cow","elephant"],"a":2},{"zh":"“灯”的英文是？","en":"What is “灯” in English?","o":["lamp","watch","ball"],"a":0},{"zh":"“铅笔”的英文是？","en":"What is “铅笔” in English?","o":["pencil","watch","umbrella"],"a":0},{"zh":"“蛋糕”的英文是？","en":"What is “蛋糕” in English?","o":["cake","grapes","milk"],"a":0},{"zh":"“球”的英文是？","en":"What is “球” in English?","o":["bed","pencil","ball"],"a":2},{"zh":"“橙”的英文是？","en":"What is “橙” in English?","o":["orange","bread","grapes"],"a":0},{"zh":"“狗”的英文是？","en":"What is “狗” in English?","o":["duck","dog","rabbit"],"a":1},{"zh":"“猫”的英文是？","en":"What is “猫” in English?","o":["cow","cat","dog"],"a":1},{"zh":"“海”的英文是？","en":"What is “海” in English?","o":["sea","star","tree"],"a":0},{"zh":"“蛋”的英文是？","en":"What is “蛋” in English?","o":["egg","rice","cookie"],"a":0},{"zh":"“耳朵”的英文是？","en":"What is “耳朵” in English?","o":["hand","ear","eye"],"a":1},{"zh":"“雨”的英文是？","en":"What is “雨” in English?","o":["moon","sun","rain"],"a":2},{"zh":"“奶奶/外婆”的英文是？","en":"What is “奶奶/外婆” in English?","o":["mother","brother","grandmother"],"a":2},{"zh":"“书”的英文是？","en":"What is “书” in English?","o":["book","teddy bear","door"],"a":0},{"zh":"“手表”的英文是？","en":"What is “手表” in English?","o":["umbrella","watch","television"],"a":1},{"zh":"“鸡”的英文是？","en":"What is “鸡” in English?","o":["rabbit","chicken","monkey"],"a":1},{"zh":"“泰迪熊”的英文是？","en":"What is “泰迪熊” in English?","o":["teddy bear","chair","pencil"],"a":0},{"zh":"“床”的英文是？","en":"What is “床” in English?","o":["bicycle","bed","bag"],"a":1},{"zh":"“饼干”的英文是？","en":"What is “饼干” in English?","o":["rice","carrot","cookie"],"a":2},{"zh":"“太阳”的英文是？","en":"What is “太阳” in English?","o":["flower","sea","sun"],"a":2},{"zh":"“书包”的英文是？","en":"What is “书包” in English?","o":["television","bag","door"],"a":1},{"zh":"“脚”的英文是？","en":"What is “脚” in English?","o":["foot","nose","hand"],"a":0},{"zh":"“牛奶”的英文是？","en":"What is “牛奶” in English?","o":["cake","bread","milk"],"a":2},{"zh":"“胡萝卜”的英文是？","en":"What is “胡萝卜” in English?","o":["carrot","grapes","cake"],"a":0},{"zh":"“兔子”的英文是？","en":"What is “兔子” in English?","o":["rabbit","dog","cow"],"a":0},{"zh":"“米饭”的英文是？","en":"What is “米饭” in English?","o":["rice","bread","milk"],"a":0},{"zh":"“老虎”的英文是？","en":"What is “老虎” in English?","o":["cat","tiger","turtle"],"a":1},{"zh":"“鸟”的英文是？","en":"What is “鸟” in English?","o":["chicken","tiger","bird"],"a":2},{"zh":"“手”的英文是？","en":"What is “手” in English?","o":["eye","hand","ear"],"a":1},{"zh":"“花”的英文是？","en":"What is “花” in English?","o":["flower","rain","moon"],"a":0},{"zh":"“姐姐/妹妹”的英文是？","en":"What is “姐姐/妹妹” in English?","o":["grandmother","brother","sister"],"a":2},{"zh":"“云”的英文是？","en":"What is “云” in English?","o":["moon","star","cloud"],"a":2},{"zh":"“big” 的反义词是？","en":"What is the opposite of “big”?","o":["small","down","night"],"a":0},{"zh":"“hot” 的反义词是？","en":"What is the opposite of “hot”?","o":["out","new","cold"],"a":2},{"zh":"“happy” 的反义词是？","en":"What is the opposite of “happy”?","o":["sad","new","short"],"a":0},{"zh":"“up” 的反义词是？","en":"What is the opposite of “up”?","o":["night","down","new"],"a":1},{"zh":"“fast” 的反义词是？","en":"What is the opposite of “fast”?","o":["night","slow","small"],"a":1},{"zh":"“tall” 的反义词是？","en":"What is the opposite of “tall”?","o":["night","cold","short"],"a":2},{"zh":"“open” 的反义词是？","en":"What is the opposite of “open”?","o":["out","new","close"],"a":2},{"zh":"“day” 的反义词是？","en":"What is the opposite of “day”?","o":["empty","down","night"],"a":2},{"zh":"“old” 的反义词是？","en":"What is the opposite of “old”?","o":["new","close","cold"],"a":0},{"zh":"“full” 的反义词是？","en":"What is the opposite of “full”?","o":["close","slow","empty"],"a":2},{"zh":"“in” 的反义词是？","en":"What is the opposite of “in”?","o":["short","out","close"],"a":1},{"zh":"“wet” 的反义词是？","en":"What is the opposite of “wet”?","o":["out","dry","sad"],"a":1},{"zh":"“cat” 变成很多个（复数）是？","en":"One cat, two …?","o":["cat","cates","cats"],"a":2},{"zh":"“box” 变成很多个（复数）是？","en":"One box, two …?","o":["boxes","boxs","box"],"a":0},{"zh":"“baby” 变成很多个（复数）是？","en":"One baby, two …?","o":["babies","babys","babyes"],"a":0},{"zh":"“child” 变成很多个（复数）是？","en":"One child, two …?","o":["childs","children","childes"],"a":1},{"zh":"“mouse” 变成很多个（复数）是？","en":"One mouse, two …?","o":["mice","mices","mouses"],"a":0},{"zh":"“foot” 变成很多个（复数）是？","en":"One foot, two …?","o":["foots","feets","feet"],"a":2},{"zh":"“bus” 变成很多个（复数）是？","en":"One bus, two …?","o":["buss","buses","bus"],"a":1},{"zh":"“tooth” 变成很多个（复数）是？","en":"One tooth, two …?","o":["tooths","teeths","teeth"],"a":2},{"zh":"选出正确的词：I ___ a student.","en":"Choose the right word: I ___ a student.","o":["is","are","am"],"a":2},{"zh":"选出正确的词：She ___ my sister.","en":"Choose the right word: She ___ my sister.","o":["am","are","is"],"a":2},{"zh":"选出正确的词：They ___ playing.","en":"Choose the right word: They ___ playing.","o":["are","am","is"],"a":0},{"zh":"选出正确的词：This is ___ apple.","en":"Choose the right word: This is ___ apple.","o":["an","a","the two"],"a":0},{"zh":"选出正确的词：I have ___ cat.","en":"Choose the right word: I have ___ cat.","o":["an","two","a"],"a":2},{"zh":"选出正确的词：He ___ to school every day.","en":"Choose the right word: He ___ to school every day.","o":["goes","go","going"],"a":0},{"zh":"选出正确的词：We ___ rice for lunch.","en":"Choose the right word: We ___ rice for lunch.","o":["eat","eats","eating"],"a":0},{"zh":"选出正确的词：The cat is ___ the box. 🐱📦","en":"Choose the right word: The cat is ___ the box. 🐱📦","o":["on","in","under"],"a":1},{"zh":"选出正确的词：The book is ___ the table.","en":"Choose the right word: The book is ___ the table.","o":["at","on","in"],"a":1},{"zh":"选出正确的词：___ is your name?","en":"Choose the right word: ___ is your name?","o":["What","Where","Who"],"a":0},{"zh":"选出正确的词：___ are you? I am fine.","en":"Choose the right word: ___ are you? I am fine.","o":["What","Who","How"],"a":2},{"zh":"选出正确的词：Look ___ the bird!","en":"Choose the right word: Look ___ the bird!","o":["in","on","at"],"a":2},{"zh":"Monday 的下一天是？","en":"What day comes after Monday?","o":["Tuesday","Wednesday","Sunday"],"a":0},{"zh":"Wednesday 的下一天是？","en":"What day comes after Wednesday?","o":["Thursday","Friday","Tuesday"],"a":0},{"zh":"Friday 的下一天是？","en":"What day comes after Friday?","o":["Saturday","Sunday","Thursday"],"a":0},{"zh":"Saturday 的下一天是？","en":"What day comes after Saturday?","o":["Sunday","Monday","Friday"],"a":0},{"zh":"“星期六”的英文是？","en":"What is 星期六 in English?","o":["Saturday","Sunday","Thursday"],"a":0},{"zh":"“Good night” 是什么意思？","en":"What does “Good night” mean?","o":["早上好","晚安","谢谢"],"a":1},{"zh":"“Thank you” 是什么意思？","en":"What does “Thank you” mean?","o":["谢谢","再见","对不起"],"a":0},{"zh":"“Sorry” 是什么意思？","en":"What does “Sorry” mean?","o":["对不起","你好","谢谢"],"a":0}],"9-10":[{"zh":"“go” 的过去式是？","en":"What is the past tense of “go”?","o":["goed","gone","went"],"a":2},{"zh":"“eat” 的过去式是？","en":"What is the past tense of “eat”?","o":["eated","eaten","ate"],"a":2},{"zh":"“run” 的过去式是？","en":"What is the past tense of “run”?","o":["ran","run","runned"],"a":0},{"zh":"“see” 的过去式是？","en":"What is the past tense of “see”?","o":["seen","seed","saw"],"a":2},{"zh":"“play” 的过去式是？","en":"What is the past tense of “play”?","o":["played","plays","plaied"],"a":0},{"zh":"“swim” 的过去式是？","en":"What is the past tense of “swim”?","o":["swum","swam","swimmed"],"a":1},{"zh":"“write” 的过去式是？","en":"What is the past tense of “write”?","o":["writed","wrote","written"],"a":1},{"zh":"“buy” 的过去式是？","en":"What is the past tense of “buy”?","o":["buyed","brought","bought"],"a":2},{"zh":"“sleep” 的过去式是？","en":"What is the past tense of “sleep”?","o":["sleeped","sleeps","slept"],"a":2},{"zh":"“take” 的过去式是？","en":"What is the past tense of “take”?","o":["took","taken","taked"],"a":0},{"zh":"“come” 的过去式是？","en":"What is the past tense of “come”?","o":["comes","came","comed"],"a":1},{"zh":"“drink” 的过去式是？","en":"What is the past tense of “drink”?","o":["drunk","drank","drinked"],"a":1},{"zh":"比较级：big → ?","en":"Compare: big → ?","o":["bigger","biger","more big"],"a":0},{"zh":"比较级：happy → ?","en":"Compare: happy → ?","o":["more happy","happier","happyer"],"a":1},{"zh":"比较级：fast → ?","en":"Compare: fast → ?","o":["faster","more fast","fastter"],"a":0},{"zh":"比较级：good → ?","en":"Compare: good → ?","o":["best","better","gooder"],"a":1},{"zh":"比较级：tall → ?","en":"Compare: tall → ?","o":["taller","taler","tallest"],"a":0},{"zh":"比较级：bad → ?","en":"Compare: bad → ?","o":["worst","worse","badder"],"a":1},{"zh":"“学校”哪个拼写是对的？","en":"Which spelling of “学校” is correct?","o":["scool","school","shcool"],"a":1},{"zh":"“朋友”哪个拼写是对的？","en":"Which spelling of “朋友” is correct?","o":["frend","friend","freind"],"a":1},{"zh":"“美丽”哪个拼写是对的？","en":"Which spelling of “美丽” is correct?","o":["beautifull","beautiful","beatiful"],"a":1},{"zh":"“星期三”哪个拼写是对的？","en":"Which spelling of “星期三” is correct?","o":["Wednesday","Wednsday","Wensday"],"a":0},{"zh":"“老师”哪个拼写是对的？","en":"Which spelling of “老师” is correct?","o":["techer","teacher","teecher"],"a":1},{"zh":"“因为”哪个拼写是对的？","en":"Which spelling of “因为” is correct?","o":["becuase","becos","because"],"a":2},{"zh":"“家庭”哪个拼写是对的？","en":"Which spelling of “家庭” is correct?","o":["family","famly","familly"],"a":0},{"zh":"“早餐”哪个拼写是对的？","en":"Which spelling of “早餐” is correct?","o":["brekfast","breakfast","breakfest"],"a":1},{"zh":"“图书馆”哪个拼写是对的？","en":"Which spelling of “图书馆” is correct?","o":["library","liberry","libary"],"a":0},{"zh":"“医生”哪个拼写是对的？","en":"Which spelling of “医生” is correct?","o":["docter","doktor","doctor"],"a":2},{"zh":"选出正确的词：She ___ reading a book now.","en":"Choose the right word: She ___ reading a book now.","o":["are","were","is"],"a":2},{"zh":"选出正确的词：Yesterday we ___ to the park.","en":"Choose the right word: Yesterday we ___ to the park.","o":["went","go","goes"],"a":0},{"zh":"选出正确的词：There ___ many fish in the sea.","en":"Choose the right word: There ___ many fish in the sea.","o":["was","are","is"],"a":1},{"zh":"选出正确的词：I ___ breakfast every morning.","en":"Choose the right word: I ___ breakfast every morning.","o":["having","has","have"],"a":2},{"zh":"选出正确的词：He doesn't ___ durian.","en":"Choose the right word: He doesn't ___ durian.","o":["liked","likes","like"],"a":2},{"zh":"选出正确的词：Can you ___ me, please?","en":"Choose the right word: Can you ___ me, please?","o":["help","helping","helps"],"a":0},{"zh":"选出正确的词：My brother is ___ than me.","en":"Choose the right word: My brother is ___ than me.","o":["tallest","taller","tall"],"a":1},{"zh":"选出正确的词：This is the ___ cake I have ever eaten!","en":"Choose the right word: This is the ___ cake I have ever eaten!","o":["best","good","better"],"a":0},{"zh":"选出正确的词：We will ___ to Penang tomorrow.","en":"Choose the right word: We will ___ to Penang tomorrow.","o":["travel","travelled","travels"],"a":0},{"zh":"选出正确的词：___ you like some water?","en":"Choose the right word: ___ you like some water?","o":["Would","Will","Are"],"a":0},{"zh":"选出正确的词：The children ___ playing football.","en":"Choose the right word: The children ___ playing football.","o":["is","am","are"],"a":2},{"zh":"选出正确的词：I was tired, ___ I went to bed early.","en":"Choose the right word: I was tired, ___ I went to bed early.","o":["but","or","so"],"a":2},{"zh":"选出正确的词：She was hungry ___ she ate.","en":"Choose the right word: She was hungry ___ she ate.","o":["so","because","but"],"a":1},{"zh":"选出正确的词：He is good ___ drawing.","en":"Choose the right word: He is good ___ drawing.","o":["on","at","in"],"a":1},{"zh":"选出正确的词：The shop opens ___ 9 o'clock.","en":"Choose the right word: The shop opens ___ 9 o'clock.","o":["at","on","in"],"a":0},{"zh":"选出正确的词：My birthday is ___ June.","en":"Choose the right word: My birthday is ___ June.","o":["in","on","at"],"a":0},{"zh":"哪个词和“happy”意思差不多？","en":"Which word means the same as “happy”?","o":["tired","angry","glad"],"a":2},{"zh":"哪个词和“big”意思差不多？","en":"Which word means the same as “big”?","o":["tiny","large","short"],"a":1},{"zh":"哪个词和“begin”意思差不多？","en":"Which word means the same as “begin”?","o":["start","stop","finish"],"a":0},{"zh":"哪个词和“quick”意思差不多？","en":"Which word means the same as “quick”?","o":["late","slow","fast"],"a":2},{"zh":"哪个词和“small”意思差不多？","en":"Which word means the same as “small”?","o":["huge","long","little"],"a":2},{"zh":"哪个词和“shut”意思差不多？","en":"Which word means the same as “shut”?","o":["break","open","close"],"a":2},{"zh":"哪一个是水果？","en":"Which one is a fruit?","o":["mango","lorry","pencil"],"a":0},{"zh":"哪一个是蔬菜？","en":"Which one is a vegetable?","o":["cookie","cabbage","mango"],"a":1},{"zh":"哪一个是职业？","en":"Which one is a job?","o":["nurse","kitchen","Sunday"],"a":0},{"zh":"哪一个是地方？","en":"Which one is a place?","o":["jump","hospital","teacher"],"a":1},{"zh":"哪一个是动词？","en":"Which one is a verb (action)?","o":["green","table","jump"],"a":2},{"zh":"哪一个是形容词？","en":"Which one is an adjective (describing word)?","o":["beautiful","chair","run"],"a":0},{"zh":"哪一个是名词？","en":"Which one is a noun (thing)?","o":["quickly","window","sing"],"a":1},{"zh":"哪一个是数字？","en":"Which word is a number?","o":["tenth floor","twenty","twice"],"a":1},{"zh":"选出正确的词：___ is my mother. (她)","en":"Choose the right word: ___ is my mother. (她)","o":["She","It","He"],"a":0},{"zh":"选出正确的词：___ are going home. (我们)","en":"Choose the right word: ___ are going home. (我们)","o":["We","Our","Us"],"a":0},{"zh":"选出正确的词：This bag is ___. (我的)","en":"Choose the right word: This bag is ___. (我的)","o":["my","me","mine"],"a":2},{"zh":"选出正确的词：Give it to ___. (他)","en":"Choose the right word: Give it to ___. (他)","o":["him","his","he"],"a":0}]}};
+const SUBJ={eng:"英文 English",math:"数学 Math"};
+const world={scene:'map',chars:[],sel:0,labels:true,auto:true,t:0,toys:[],apples:[],lightsOff:false,tv:false,bell:0,shake:0,
+  toilet:{open:0,target:0,occ:null},timers:[],fade:0,fadeDir:0,pending:null,pick:{sub:'eng',age:'5-6'},best:{},toyN:0,jump:null,afterSwitch:null};
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const rand=(a,b)=>a+Math.random()*(b-a);
+function after(t,fn){world.timers.push({t,fn});}
+function toast(t){document.getElementById('toast').textContent=t;}
+function say(c,text,dur=2.2){c.bubble=text;c.bt=dur;}
+
+const DESKS=[190,330,470,610];
+const SOFA=[352,420,488];
+const BEDS={big:[{hx:172,top:340},{hx:182,top:354}],bunk:[{hx:490,top:345},{hx:490,top:220}]};
+const SC={
+  map:{f:[428,495],objs:[
+    {lab:'🏫 去学校 School',hit:[50,95,290,320],ax:205,ay:432,lx:195,ly:80,act:()=>goScene('school','map')},
+    {lab:'🏠 回家 Home',hit:[485,140,290,275],ax:630,ay:432,lx:630,ly:125,act:()=>goScene('home','map')},
+    {lab:'🌳 摇一摇 Shake',hit:[355,180,130,240],ax:420,ay:440,lx:420,ly:170,act:c=>shakeTree(c)}]},
+  school:{f:[385,540],objs:[
+    {lab:'✏️ 闯关 Quiz',hit:[222,42,356,214],ax:400,ay:395,lx:400,ly:30,act:()=>openQuiz()},
+    ...DESKS.map((x,i)=>({lab:i===0?'🪑 坐下 Sit':'',hit:[x-55,425,110,60],ax:x,ay:510,act:c=>sitDesk(c,i)})),
+    {lab:'🔔 上课铃 Bell',hit:[655,190,70,90],instant:true,lx:690,ly:300,act:()=>ringBell()},
+    {lab:'🚪 回地图 Map',hit:[25,160,90,210],ax:75,ay:395,lx:70,ly:145,act:()=>goScene('map','school')}]},
+  home:{f:[385,540],objs:[
+    {lab:'🚪 出门 Map',hit:[20,160,85,210],ax:62,ay:395,lx:62,ly:145,act:()=>goScene('map','home')},
+    {lab:'📺 电视 TV',hit:[135,185,165,185],instant:true,lx:215,ly:170,act:()=>{world.tv=!world.tv;toast(world.tv?'电视打开了 · TV on 📺':'电视关了 · TV off');world.chars.forEach(c=>{if(c.seat&&c.seat.startsWith('sofa'))say(c,world.tv?'好看！Fun!':'哎呀 Aww');});}},
+    {lab:'🛋️ 沙发 Sofa',hit:[288,270,265,135],ax:420,ay:415,lx:420,ly:255,act:c=>sitSofa(c)},
+    {lab:'🚽 厕所 Toilet',hit:[560,160,85,210],ax:602,ay:395,lx:602,ly:145,act:c=>useToilet(c)},
+    {lab:'🛏️ 卧室 Bedroom',hit:[670,160,85,210],ax:712,ay:395,lx:712,ly:145,act:()=>goScene('bedroom','home')}]},
+  bedroom:{f:[390,540],objs:[
+    {lab:'🚪 客厅 Living',hit:[20,160,85,210],ax:62,ay:398,lx:62,ly:145,act:()=>goScene('home','bedroom')},
+    {lab:'😴 大床 Big bed',hit:[120,250,285,148],ax:270,ay:412,lx:262,ly:236,act:c=>sleepIn(c,'big')},
+    {lab:'😴 双层床 Bunk bed',hit:[448,78,215,320],ax:545,ay:412,lx:545,ly:64,act:c=>sleepIn(c,'bunk')},
+    {lab:'💡 开关灯 Light',hit:[400,250,62,145],instant:true,lx:432,ly:236,act:()=>{world.lightsOff=!world.lightsOff;toast(world.lightsOff?'关灯了，晚安 · Lights off, good night 🌙':'开灯啦 · Lights on 💡');if(world.lightsOff)world.chars.forEach(c=>{if(c.state==='sleep')say(c,'晚安 Good night',2.5);});}},
+    {lab:'🧸 玩具箱 Toys',hit:[648,350,125,85],ax:700,ay:455,lx:710,ly:338,act:c=>openToys(c)}]}
+};
+function S(y){const f=SC[world.scene].f;return .72+.38*(y-f[0])/(f[1]-f[0]);}
+function charH(c){return 190*c.m.scale*S(c.y);}
+function syncChars(){
+  const keep=world.chars;world.chars=members.map((m,i)=>{const o=keep.find(c=>c.m===m);if(o)return o;
+    const f=SC[world.scene].f;return {m,x:300+i*60,y:f[0]+30+(i%2)*25,tx:0,ty:0,state:'idle',ph:0,bubble:null,bt:0,busy:0,wt:rand(2,6),seat:null,bed:null,hidden:false,onArrive:null};});
+  world.sel=clamp(world.sel,0,world.chars.length-1);
+}
+function selChar(){return world.chars[world.sel];}
+function standUp(c){
+  if(c.hidden)return false;
+  if(c.state==='sleep'&&c.bed){const s=BEDS[c.bed.id][c.bed.i];c.x=s.hx+70;c.y=SC[world.scene].f[0]+22;}
+  if(c.seat){c.y=c.seat.startsWith('desk')?510:415;}
+  c.seat=null;c.bed=null;if(c.state!=='walk')c.state='idle';c.busy=0;return true;
+}
+function walk(c,x,y,cb){
+  if(!standUp(c)){toast(`${c.m.name} 在厕所里，等一下 · is in the toilet, please wait`);return;}
+  const f=SC[world.scene].f;c.tx=clamp(x,30,770);c.ty=clamp(y,f[0],f[1]);c.state='walk';c.onArrive=cb||null;
+}
+function sitDesk(c,i){
+  if(world.chars.some(o=>o!==c&&o.seat==='desk'+i)){say(c,'有人坐了 Taken');return;}
+  c.seat='desk'+i;c.x=DESKS[i];c.y=478;c.state='sit';say(c,'上课啦 Class!',1.6);
+}
+function sitSofa(c){
+  const i=SOFA.findIndex((x,j)=>!world.chars.some(o=>o.seat==='sofa'+j));
+  if(i<0){say(c,'坐满了 Full!');return;}
+  c.seat='sofa'+i;c.x=SOFA[i];c.y=402;c.state='sit';say(c,world.tv?'看电视 TV time!':'好舒服 Comfy~',1.8);
+}
+function sleepIn(c,id){
+  const i=BEDS[id].findIndex((s,j)=>!world.chars.some(o=>o.bed&&o.bed.id===id&&o.bed.i===j));
+  if(i<0){say(c,'床满了 Bed is full');return;}
+  c.state='sleep';c.bed={id,i};say(c,id==='bunk'&&i===1?'爬上去！Up I go!':'晚安 Good night',1.8);
+}
+function useToilet(c){
+  const T=world.toilet;
+  if(T.occ){say(c,'有人！Occupied!');return;}
+  T.occ=c;c.state='busy';T.target=1;toast(`${c.m.name} 进厕所了 · went to the toilet 🚽`);
+  after(.5,()=>{c.hidden=true;T.target=0;});
+  after(4,()=>{T.target=1;c.hidden=false;c.x=602;c.y=398;c.state='idle';say(c,'冲水~ 洗手啦 Flush! Wash hands 🧼',2.6);});
+  after(4.6,()=>{T.target=0;T.occ=null;});
+}
+const TOYS=[['ball','⚽ 皮球 Ball'],['car','🚗 小汽车 Toy car'],['teddy','🧸 小熊 Teddy'],['blocks','🧱 积木 Blocks']];
+function openToys(c){
+  const [type,name]=TOYS[world.toyN++%TOYS.length];
+  world.toys.push({type,x:rand(300,600),y:rand(450,530),z:60,vx:0,vz:120,fall:false});
+  if(world.toys.length>6)world.toys.shift();
+  c.state='play';c.busy=2.6;say(c,'一起玩！'+name,2.4);
+}
+function shakeTree(c){world.shake=1;world.apples.push({x:rand(380,465),y:250,vy:0,life:2.4});say(c,'🍎 掉苹果啦 An apple!');}
+function ringBell(){
+  world.bell=1;toast('叮铃铃～上课啦 · Ring ring, class time! 🔔');let free=[0,1,2,3].filter(i=>!world.chars.some(o=>o.seat==='desk'+i));
+  world.chars.forEach(c=>{if(c.seat&&c.seat.startsWith('desk'))return;const i=free.shift();if(i===undefined){say(c,'我站着听 I\'ll stand');return;}walk(c,DESKS[i],510,()=>sitDesk(c,i));});
+}
+const ENTRY={map:{school:[205,440],home:[630,440],_:[420,460]},school:{_:[110,420]},home:{map:[95,420],bedroom:[700,420],_:[95,420]},bedroom:{_:[95,420]}};
+function goScene(name,from){if(world.fadeDir)return;if(world.jump)endJump();world.pending={name,from};world.fadeDir=1;}
+function doSwitch(){
+  const {name,from}=world.pending;world.pending=null;world.scene=name;world.timers=[];world.toilet={open:0,target:0,occ:null};
+  const e=ENTRY[name][from]||ENTRY[name]._,dir=e[0]>400?-1:1;
+  world.chars.forEach((c,i)=>{c.hidden=false;c.seat=null;c.bed=null;c.busy=0;c.onArrive=null;c.state='idle';
+    c.x=clamp(e[0]+dir*i*28,30,770);c.y=clamp(e[1]+(i%2)*20,SC[name].f[0],SC[name].f[1]);walk(c,c.x+dir*(60+i*45),c.y+rand(0,40));});
+  document.querySelectorAll('#scenebar button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.go===name));
+  if(world.afterSwitch){const f=world.afterSwitch;world.afterSwitch=null;after(.35,f);}
+  toast({map:'小镇地图：点学校或家 · Town map: tap the school or home',school:'学校：点黑板闯关，点铃铛上课 · School: tap the board for a quiz',home:'客厅：沙发、电视、厕所 · Living room: sofa, TV, toilet',bedroom:'卧室：上床睡觉、开关灯、玩具 · Bedroom: beds, light, toys'}[name]);
+}
+document.querySelectorAll('#scenebar button').forEach(b=>b.onclick=()=>{if(b.dataset.go!==world.scene)goScene(b.dataset.go,world.scene);});
+document.getElementById('gather').onclick=()=>{if(world.jump)return;const s=selChar();if(!s||s.hidden)return;let k=0;world.chars.forEach(c=>{if(c===s)return;k++;walk(c,s.x+(k%2?1:-1)*Math.ceil(k/2)*55,s.y+rand(-10,15));});say(s,'集合啦！Come here!');};
+const tgl=(id,key)=>{const b=document.getElementById(id);b.onclick=()=>{world[key]=!world[key];b.setAttribute('aria-pressed',world[key]);};};
+tgl('autoWalk','auto');tgl('labels','labels');
+
+
+/* ---------- bed jump game ---------- */
+const JB={x0:165,x1:365,top:340,floor:470,rounds:5};
+const jumpBtn=document.getElementById('jumpBtn');
+function updateJumpBtn(){jumpBtn.textContent=world.jump?'⏹ 结束跳床 · Stop bed jump':'🤸 跳床游戏 · Bed jump game';}
+function curCatcher(){const j=world.jump;return j.others[j.ci%j.others.length];}
+function placeJumpCrowd(){
+  const j=world.jump,C=curCatcher();let k=0;
+  j.others.forEach(c=>{c.state='idle';c.busy=0;if(c===C){c.x=rand(140,420);c.y=JB.floor;return;}c.x=520+(k%3)*85;c.y=430+(k%2)*45;k++;});
+}
+function startJump(){
+  if(world.chars.length<2){toast('至少要两个角色才能玩 · You need at least 2 characters');return;}
+  if(world.scene!=='bedroom'){world.afterSwitch=startJump;goScene('bedroom',world.scene);return;}
+  world.lightsOff=false;
+  world.chars.forEach(c=>{c.hidden=false;c.seat=null;c.bed=null;c.state='idle';c.onArrive=null;c.busy=0;});
+  const J=selChar();
+  world.jump={J,others:world.chars.filter(c=>c!==J),ci:0,round:0,score:0,phase:'bounce',t:0,pt:0,x:265,dir:1,z:0,fy:0,sy:0,ft:0,spin:0,cdir:1,csp:100};
+  placeJumpCrowd();say(J,'我要跳啦！Watch me!',1.8);say(curCatcher(),'我来接！I\'ll catch!',1.8);
+  toast('等接的人走到你下面，再点屏幕跳下去！Wait until the catcher is under you, then tap to jump!');updateJumpBtn();
+}
+function endJump(){
+  const j=world.jump;if(!j)return;world.jump=null;
+  j.J.x=300;j.J.y=430;world.chars.forEach(c=>{c.state='idle';c.busy=0;c.onArrive=null;});updateJumpBtn();
+}
+function jumpTap(){const j=world.jump;if(j.phase!=='bounce')return;j.phase='fly';j.ft=0;j.sy=JB.top-j.z;say(j.J,'跳！Jump!',1);}
+function nextJumpRound(){
+  const j=world.jump;j.round++;
+  if(j.round>=JB.rounds){j.phase='done';j.pt=0;world.chars.forEach(c=>{c.state='cheer';});
+    say(j.J,`接住 ${j.score}/${JB.rounds} 次！`,3);toast(`🏆 ${JB.rounds} 次里接住了 ${j.score} 次 · Caught ${j.score} of ${JB.rounds}!`);return;}
+  j.ci++;j.phase='bounce';j.t=0;j.x=rand(200,330);j.csp=100+j.round*18;placeJumpCrowd();say(curCatcher(),'换我接！My turn!',1.6);
+}
+function updateJump(dt){
+  const j=world.jump,C=curCatcher();j.t+=dt;
+  j.others.forEach(c=>{if(c!==C&&c.state==='cheer'&&j.phase!=='done'&&Math.random()<dt*.4)c.state='idle';});
+  if(j.phase==='bounce'){
+    C.x+=j.cdir*j.csp*dt;if(C.x<130){C.x=130;j.cdir=1;}if(C.x>430){C.x=430;j.cdir=-1;}if(Math.random()<dt*.45)j.cdir*=-1;C.state='walk';C.y=JB.floor;
+    j.x+=j.dir*65*dt;if(j.x<JB.x0||j.x>JB.x1){j.dir*=-1;j.x=clamp(j.x,JB.x0,JB.x1);}
+    j.z=62*Math.abs(Math.sin(j.t*3.3));
+  }else if(j.phase==='fly'){
+    j.ft+=dt;const p=Math.min(1,j.ft/.8);C.x+=clamp(j.x-C.x,-75*dt,75*dt);C.state='walk';
+    const ty=C.y-charH(C)*.95;j.fy=j.sy+(ty-j.sy)*p-95*Math.sin(Math.PI*p);
+    if(p>=1){
+      if(Math.abs(j.x-C.x)<50){j.phase='lift';j.pt=0;j.score++;C.state='lift';say(C,'接住了！Got you!',1.6);j.others.forEach(c=>{if(c!==C)c.state='cheer';});}
+      else{j.phase='miss';j.pt=0;C.state='idle';say(j.J,'哎哟！Oops!',1.4);say(C,'差一点！So close!',1.4);}
+    }
+  }else if(j.phase==='lift'){j.pt+=dt;if(j.pt>.45){j.phase='spin';j.pt=0;say(j.J,'转圈圈～ Wheee!',1.6);}}
+  else if(j.phase==='spin'){j.pt+=dt;j.spin=Math.min(1,j.pt/1.5)*Math.PI*2;if(j.pt>=1.5){j.phase='down';j.pt=0;j.spin=0;}}
+  else if(j.phase==='down'){j.pt+=dt;if(j.pt>.6)nextJumpRound();}
+  else if(j.phase==='miss'){j.pt+=dt;j.fy=Math.min(JB.floor+22,j.fy+600*dt);if(j.pt>1.2)nextJumpRound();}
+  else if(j.phase==='done'){j.pt+=dt;if(j.pt>3.2)endJump();}
+}
+function renderJump(){
+  const j=world.jump,J=j.J,C=curCatcher(),held=['lift','spin','down'].includes(j.phase);
+  const sx=j.phase==='spin'?Math.cos(j.spin):1, sxs=Math.abs(sx)<.06?(sx<0?-.06:.06):sx;
+  if(j.phase==='bounce'){g.save();g.setLineDash([6,8]);g.strokeStyle='rgba(240,96,60,.75)';g.lineWidth=3;g.beginPath();g.moveTo(j.x,JB.top+30);g.lineTo(j.x,JB.floor);g.stroke();g.restore();
+    g.strokeStyle='rgba(240,96,60,.9)';g.lineWidth=3;g.beginPath();g.ellipse(j.x,JB.floor,36,9,0,0,Math.PI*2);g.stroke();}
+  world.chars.filter(c=>c!==J).sort((a,b)=>a.y-b.y).forEach(c=>{
+    const h=charH(c);g.fillStyle='rgba(0,0,0,.16)';g.beginPath();g.ellipse(c.x,c.y,h*.24,h*.06,0,0,Math.PI*2);g.fill();
+    let pose=c.state==='walk'?'walk':c.state==='cheer'?'cheer':c.state==='lift'||(c===C&&held)?'lift':'idle';
+    if(c===C&&j.phase==='spin'){g.save();g.translate(c.x,0);g.scale(sxs,1);drawChar(g,c.m,0,c.y,h,{pose:'lift'});g.restore();}
+    else drawChar(g,c.m,c.x,c.y,h,{pose,phase:c.ph});
+  });
+  const jh=150*J.m.scale;let jx=j.x,jy,pose='cheer';
+  if(j.phase==='bounce')jy=JB.top-j.z;
+  else if(j.phase==='fly')jy=j.fy;
+  else if(held){jx=C.x;const top=C.y-charH(C)*.92;jy=j.phase==='lift'?top-Math.min(1,j.pt/.45)*14:j.phase==='down'?top-14+Math.min(1,j.pt/.6)*14:top-14;}
+  else if(j.phase==='miss'){jy=j.fy;pose=j.fy>=JB.floor+20?'sit':'cheer';}
+  else{jx=300;jy=440;}
+  if(j.phase==='fly'||j.phase==='miss'){g.fillStyle='rgba(0,0,0,.18)';g.beginPath();g.ellipse(jx,JB.floor+22,30,7,0,0,Math.PI*2);g.fill();}
+  if(j.phase==='spin'){g.save();g.translate(jx,0);g.scale(sxs,1);drawChar(g,J.m,0,jy,jh,{pose:'cheer',phase:world.t*6});g.restore();}
+  else drawChar(g,J.m,jx,jy,jh,{pose,phase:world.t*6});
+  if(j.phase!=='done'){pill(g,`🤸 第 ${Math.min(j.round+1,JB.rounds)}/${JB.rounds} 跳 · Jump ${Math.min(j.round+1,JB.rounds)} of ${JB.rounds}   ⭐ ${j.score}`,170,22);}
+  if(j.phase==='bounce'){g.globalAlpha=.6+.4*Math.abs(Math.sin(world.t*4));pill(g,'👆 点屏幕跳下去！Tap to jump!',400,H-26);g.globalAlpha=1;}
+}
+jumpBtn.onclick=()=>{world.jump?endJump():startJump();};
+
+/* ---------- chips ---------- */
+function buildChips(){
+  const who=document.getElementById('who');who.querySelectorAll('.chip').forEach(n=>n.remove());
+  world.chars.forEach((c,i)=>{const b=document.createElement('button');b.className='chip';b.setAttribute('aria-pressed',i===world.sel);
+    b.innerHTML=`<canvas width="88" height="88"></canvas>${c.m.name.split(' ')[0]}`;drawFace(b.querySelector('canvas').getContext('2d'),44,44,38,c.m);
+    b.onclick=()=>{world.sel=i;buildChips();say(c,'我来了！Me!',1.2);};who.appendChild(b);});
+}
+
+/* ---------- input ---------- */
+let down=null;
+function pt(e){const r=game.getBoundingClientRect();return{x:(e.clientX-r.left)/r.width*W,y:(e.clientY-r.top)/r.height*H};}
+function inR(p,h){return p.x>=h[0]&&p.x<=h[0]+h[2]&&p.y>=h[1]&&p.y<=h[1]+h[3];}
+function charAt(p){
+  const list=world.chars.filter(c=>!c.hidden).sort((a,b)=>b.y-a.y);
+  for(const c of list){
+    if(c.state==='sleep'){const s=BEDS[c.bed.id][c.bed.i],L=150*c.m.scale;if(p.x>s.hx-30&&p.x<s.hx+L&&Math.abs(p.y-(s.top-20))<35)return c;continue;}
+    const h=charH(c),w=h*.42;if(p.x>c.x-w&&p.x<c.x+w&&p.y>c.y-h&&p.y<c.y+5)return c;}
+  return null;
+}
+game.addEventListener('pointerdown',e=>{if(world.fadeDir)return;if(world.jump){jumpTap();return;}const p=pt(e);game.setPointerCapture(e.pointerId);down={p,c:charAt(p),drag:false};});
+game.addEventListener('pointermove',e=>{if(!down||!down.c)return;const p=pt(e),c=down.c;
+  if(!down.drag&&Math.hypot(p.x-down.p.x,p.y-down.p.y)>12){if(!standUp(c)){down=null;return;}down.drag=true;c.state='dangle';c.onArrive=null;world.sel=world.chars.indexOf(c);buildChips();}
+  if(down.drag){c.x=clamp(p.x,30,770);c.y=clamp(p.y+charH(c)*.8,60,H);}});
+game.addEventListener('pointerup',e=>{if(!down)return;const p=pt(e),d=down;down=null;
+  if(d.drag){const c=d.c,f=SC[world.scene].f;c.y=clamp(c.y,f[0],f[1]);c.state='idle';say(c,['哇！Wheee!','好高！So high!','落地！Landed!'][Math.floor(Math.random()*3)],1.4);return;}
+  if(d.c){const c=d.c;world.sel=world.chars.indexOf(c);buildChips();
+    if(c.state==='sleep'){standUp(c);say(c,'早上好！Good morning!');}else if(c.state==='idle'){c.state='wave';c.busy=1.2;say(c,'Hi! '+c.m.name,1.4);}else say(c,'Hi!',1);return;}
+  const toy=[...world.toys].reverse().find(t=>world.scene==='bedroom'&&Math.hypot(p.x-t.x,p.y-(t.y-22-t.z))<38);
+  if(toy){poke(toy);return;}
+  const obj=SC[world.scene].objs.find(o=>inR(p,o.hit));const c=selChar();if(!c)return;
+  if(obj){if(obj.instant){obj.act(c);return;}walk(c,obj.ax,obj.ay,()=>obj.act(c));return;}
+  const f=SC[world.scene].f;walk(c,p.x,p.y<f[0]?f[0]+10:p.y);
+});
+game.addEventListener('pointercancel',()=>{if(down&&down.drag){down.c.state='idle';const f=SC[world.scene].f;down.c.y=clamp(down.c.y,f[0],f[1]);}down=null;});
+function poke(t){if(t.type==='ball'){t.vx=(Math.random()<.5?-1:1)*rand(250,380);t.vz=320;}else if(t.type==='car'){t.vx=t.vx>0?-300:300;}else if(t.type==='teddy'){t.vz=300;}else{t.fall=!t.fall;}}
+
+/* ---------- update ---------- */
+function update(dt){
+  world.t+=dt;
+  for(let i=world.timers.length-1;i>=0;i--){const tm=world.timers[i];tm.t-=dt;if(tm.t<=0){world.timers.splice(i,1);tm.fn();}}
+  if(world.fadeDir){world.fade+=world.fadeDir*dt*4;if(world.fade>=1){world.fade=1;doSwitch();world.fadeDir=-1;}if(world.fade<=0&&world.fadeDir<0){world.fade=0;world.fadeDir=0;}}
+  const T=world.toilet;T.open+=(T.target-T.open)*Math.min(1,dt*10);
+  world.bell=Math.max(0,world.bell-dt*.6);world.shake=Math.max(0,world.shake-dt*1.5);
+  const f=SC[world.scene].f;
+  if(world.jump){world.chars.forEach(c=>{if(c.bt>0){c.bt-=dt;if(c.bt<=0)c.bubble=null;}c.ph+=dt*(c.state==='walk'?11:4);});updateJump(dt);}
+  else world.chars.forEach((c,i)=>{
+    if(c.bt>0){c.bt-=dt;if(c.bt<=0)c.bubble=null;}
+    c.ph+=dt*(c.state==='walk'?11:4);
+    if(c.busy>0){c.busy-=dt;if(c.busy<=0&&['play','wave','cheer'].includes(c.state))c.state='idle';}
+    if(c.state==='walk'){const dx=c.tx-c.x,dy=c.ty-c.y,d=Math.hypot(dx,dy),sp=175*S(c.y)*dt;
+      if(d<=sp){c.x=c.tx;c.y=c.ty;c.state='idle';const cb=c.onArrive;c.onArrive=null;cb&&cb();}else{c.x+=dx/d*sp;c.y+=dy/d*sp;}}
+    if(world.auto&&c.state==='idle'&&i!==world.sel&&!c.seat&&!c.bed&&!c.hidden){c.wt-=dt;if(c.wt<=0){c.wt=rand(4,9);
+      walk(c,clamp(c.x+rand(-220,220),40,760),rand(f[0],f[1]));}}
+  });
+  world.toys.forEach(t=>{t.x+=t.vx*dt;if(t.type!=='car')t.vx*=Math.pow(.4,dt);
+    if(t.x<40||t.x>760){if(t.type==='car')t.x=t.x<40?760:40;else{t.vx=-t.vx;t.x=clamp(t.x,40,760);}}
+    t.z+=t.vz*dt;t.vz-=900*dt;if(t.z<0){t.z=0;t.vz=Math.abs(t.vz)>120?-t.vz*.45:0;}});
+  world.apples.forEach(a=>{a.vy+=900*dt;a.y=Math.min(445,a.y+a.vy*dt);a.life-=dt;});world.apples=world.apples.filter(a=>a.life>0);
+}
+
+/* ---------- scene art ---------- */
+function door(ctx,x,y,w,h,col,open=0){
+  ctx.fillStyle='#5B3A24';rr(ctx,x-6,y-6,w+12,h+6,8);ctx.fill();
+  ctx.fillStyle='#22324D';ctx.fillRect(x,y,w,h);
+  const pw=w*(1-open*.82);ctx.fillStyle=col;rr(ctx,x,y,pw,h,4);ctx.fill();
+  if(pw>w*.5){ctx.fillStyle='rgba(255,255,255,.35)';rr(ctx,x+pw*.2,y+18,pw*.6,h*.28,6);ctx.fill();circ(ctx,x+pw-12,y+h*.55,5,'#FFC23A');}
+}
+function tube(ctx,x1,x2,y,on=true){ctx.fillStyle='#C9D3E0';ctx.fillRect(x1-6,y-3,x2-x1+12,16);
+  if(on){const gr=ctx.createLinearGradient(0,y,0,y+90);gr.addColorStop(0,'rgba(255,248,220,.55)');gr.addColorStop(1,'rgba(255,248,220,0)');ctx.fillStyle=gr;ctx.beginPath();ctx.moveTo(x1,y+10);ctx.lineTo(x2,y+10);ctx.lineTo(x2+50,y+90);ctx.lineTo(x1-50,y+90);ctx.fill();}
+  ctx.fillStyle=on?'#FFFBEA':'#9AA6B8';rr(ctx,x1,y,x2-x1,10,5);ctx.fill();}
+function cloud(ctx,x,y,s){ctx.fillStyle='rgba(255,255,255,.95)';[[0,0,26],[24,-10,30],[52,0,24],[26,8,24]].forEach(([a,b,r])=>{ctx.beginPath();ctx.arc(x+a*s,y+b*s,r*s,0,Math.PI*2);ctx.fill();});}
+function drawMap(ctx,t){
+  let gr=ctx.createLinearGradient(0,0,0,420);gr.addColorStop(0,'#86CFFF');gr.addColorStop(1,'#DDF3FF');ctx.fillStyle=gr;ctx.fillRect(0,0,W,420);
+  circ(ctx,740,70,40,'#FFC23A');
+  for(let i=0;i<3;i++)cloud(ctx,((t*14+i*330)%1050)-120,50+i*32,.9+i*.15);
+  ctx.fillStyle='#A6DE98';ctx.beginPath();ctx.ellipse(170,430,360,120,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#8AD483';ctx.beginPath();ctx.ellipse(660,440,380,130,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#6CC46F';ctx.fillRect(0,405,W,20);
+  ctx.fillStyle='#F3E3C3';ctx.fillRect(0,420,W,82);ctx.strokeStyle='rgba(150,110,60,.25)';ctx.lineWidth=2;for(let x=0;x<W;x+=50){ctx.beginPath();ctx.moveTo(x,420);ctx.lineTo(x-14,502);ctx.stroke();}
+  ctx.fillStyle='#4A5068';ctx.fillRect(0,502,W,58);ctx.fillStyle='#fff';for(let x=0;x<W;x+=70)ctx.fillRect(x+10,529,38,5);
+  // school
+  ctx.fillStyle='#F0603C';ctx.fillRect(60,175,270,245);
+  ctx.fillStyle='#C9442A';ctx.beginPath();ctx.moveTo(42,180);ctx.lineTo(348,180);ctx.lineTo(195,95);ctx.closePath();ctx.fill();
+  circ(ctx,195,145,20,'#fff');ctx.strokeStyle='#1E2A45';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(195,145);ctx.lineTo(195,132);ctx.moveTo(195,145);ctx.lineTo(205,149);ctx.stroke();
+  ctx.fillStyle='#fff';[[80,200],[140,200],[230,200],[285,200],[80,265],[285,265]].forEach(([x,y])=>{rr(ctx,x,y,38,42,5);ctx.fill();});
+  ctx.fillStyle='#9FDBFF';[[84,204],[144,204],[234,204],[289,204],[84,269],[289,269]].forEach(([x,y])=>ctx.fillRect(x,y,30,34));
+  ctx.fillStyle='#FFC23A';rr(ctx,135,258,120,34,8);ctx.fill();ctx.fillStyle='#1E2A45';ctx.font=`800 19px ${FD}`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('学校 SCHOOL',195,276);
+  door(ctx,170,325,70,95,'#7A4A2A');
+  ctx.strokeStyle='#8A93A8';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(335,420);ctx.lineTo(335,250);ctx.stroke();ctx.fillStyle='#E9568B';ctx.beginPath();ctx.moveTo(337,252);ctx.lineTo(372+Math.sin(t*4)*4,264);ctx.lineTo(337,278);ctx.fill();
+  // house
+  ctx.fillStyle='#FFD36B';ctx.fillRect(500,235,260,185);
+  ctx.fillStyle='#2F7DE1';ctx.beginPath();ctx.moveTo(482,240);ctx.lineTo(778,240);ctx.lineTo(630,140);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#8A5A3A';ctx.fillRect(700,160,26,50);
+  ctx.fillStyle='#fff';[[520,265],[690,265]].forEach(([x,y])=>{rr(ctx,x,y,52,50,6);ctx.fill();});
+  ctx.fillStyle='#FFF1B8';[[525,270],[695,270]].forEach(([x,y])=>ctx.fillRect(x,y,42,40));
+  ctx.fillStyle='#1E2A45';ctx.font=`800 18px ${FD}`;ctx.fillText('家 HOME',630,212);
+  door(ctx,600,330,62,90,'#E9568B');
+  // tree
+  const sx=Math.sin(t*40)*world.shake*7;ctx.fillStyle='#8A5A3A';ctx.fillRect(408,300,26,130);
+  [[420,250,66],[378,285,48],[464,285,48],[420,300,44]].forEach(([x,y,r])=>circ(ctx,x+sx,y,r,'#3FAE5B'));
+  [[395,240],[445,262],[410,292],[460,300]].forEach(([x,y])=>circ(ctx,x+sx,y,8,'#E83B3B'));
+  world.apples.forEach(a=>circ(ctx,a.x,a.y,9,'#E83B3B'));
+  // bus
+  const bx=((t*95)%1400)-300;ctx.fillStyle='#FFC23A';rr(ctx,bx,507,170,44,10);ctx.fill();ctx.fillStyle='#BFE6FF';for(let i=0;i<5;i++)ctx.fillRect(bx+10+i*31,514,24,16);
+  circ(ctx,bx+35,552,10,'#1E2A45');circ(ctx,bx+135,552,10,'#1E2A45');
+}
+function drawSchool(ctx,t){
+  ctx.fillStyle='#DDF1E4';ctx.fillRect(0,0,W,375);ctx.fillStyle='#BFE3CC';ctx.fillRect(0,300,W,75);
+  const AB='A B C D 1 2 3 4'.split(' '),cols=['#F0603C','#2F7DE1','#36A866','#FFB020','#E9568B','#8E5CD9'];
+  ctx.font=`800 22px ${FD}`;ctx.textAlign='center';ctx.textBaseline='middle';AB.forEach((s,i)=>{ctx.fillStyle=cols[i%6];ctx.fillText(s,140+i*22,330+(i%2)*6);});
+  ctx.fillStyle='#E3B57C';ctx.fillRect(0,375,W,H-375);ctx.strokeStyle='rgba(120,70,30,.22)';ctx.lineWidth=2;for(let y=400;y<H;y+=32){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+  tube(ctx,120,300,6);tube(ctx,500,680,6);
+  ctx.fillStyle='#fff';rr(ctx,620,60,155,125,10);ctx.fill();ctx.fillStyle='#9FDBFF';ctx.fillRect(632,72,131,101);cloud(ctx,660+Math.sin(t*.3)*10,120,.55);ctx.fillStyle='#fff';ctx.fillRect(694,72,7,101);ctx.fillRect(632,120,131,6);
+  ctx.fillStyle='#8A5A3A';rr(ctx,222,42,356,214,10);ctx.fill();ctx.fillStyle='#25503C';ctx.fillRect(234,54,332,186);ctx.fillStyle='#C9A27A';ctx.fillRect(240,240,320,10);
+  ctx.fillStyle='#fff';ctx.font=`800 30px ${FD}`;ctx.fillText('英文 + 数学 闯关',400,92);
+  ctx.font=`700 19px ${FB}`;ctx.fillText(`English & Math · 5–10 岁 · ${BANK_N} 题`,400,128);
+  const bk=world.best[world.pick.sub+'|'+world.pick.age]||0;ctx.font=`700 16px ${FB}`;ctx.fillStyle='#FFE08A';ctx.fillText(`${SUBJ[world.pick.sub]} ${world.pick.age} 岁 · 最高 Best ${bk}/10`,400,166);
+  ctx.fillStyle='rgba(255,255,255,'+(.65+Math.sin(t*4)*.3)+')';ctx.font=`800 17px ${FB}`;ctx.fillText('▶ 点我闯关 Tap to play',400,212);
+  door(ctx,25,160,90,215,'#7A4A2A');
+  ctx.fillStyle='#8A93A8';ctx.fillRect(686,190,8,22);ctx.save();ctx.translate(690,212);ctx.rotate(Math.sin(t*28)*.5*world.bell);
+  ctx.fillStyle='#FFC23A';ctx.beginPath();ctx.moveTo(-24,48);ctx.quadraticCurveTo(-24,0,0,0);ctx.quadraticCurveTo(24,0,24,48);ctx.closePath();ctx.fill();circ(ctx,0,52,7,'#C98A12');ctx.restore();
+}
+function drawDesk(ctx,x){ctx.fillStyle='#8A5A3A';ctx.fillRect(x-48,478,8,40);ctx.fillRect(x+40,478,8,40);ctx.fillStyle='#C98B4E';rr(ctx,x-58,440,116,14,5);ctx.fill();ctx.fillStyle='#B07740';ctx.fillRect(x-52,454,104,30);ctx.fillStyle='#fff';ctx.fillRect(x-20,433,40,8);}
+function drawHome(ctx,t){
+  ctx.fillStyle='#FFF0D6';ctx.fillRect(0,0,W,375);ctx.fillStyle='rgba(240,180,120,.18)';for(let x=10;x<W;x+=40)for(let y=20;y<360;y+=40)circ(ctx,x+(y/40%2)*20,y,3,'rgba(240,160,100,.25)');
+  ctx.fillStyle='#E2C9A0';ctx.fillRect(0,362,W,13);
+  ctx.fillStyle='#C99D72';ctx.fillRect(0,375,W,H-375);ctx.strokeStyle='rgba(100,60,30,.2)';ctx.lineWidth=2;for(let y=400;y<H;y+=30){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+  ctx.fillStyle='rgba(242,140,107,.55)';ctx.beginPath();ctx.ellipse(430,475,250,48,0,0,Math.PI*2);ctx.fill();
+  tube(ctx,330,520,6);
+  door(ctx,20,160,85,215,'#2F7DE1');
+  ctx.fillStyle='#8A5A3A';rr(ctx,135,300,165,75,8);ctx.fill();ctx.fillStyle='#6E4628';ctx.fillRect(150,320,135,6);
+  ctx.fillStyle='#1E2A45';rr(ctx,148,188,140,108,10);ctx.fill();
+  if(world.tv){const hue=(t*60)%360;ctx.fillStyle=`hsl(${hue},70%,62%)`;ctx.fillRect(157,197,122,88);ctx.fillStyle='#fff';ctx.beginPath();ctx.ellipse(218,268,46,10,0,0,Math.PI*2);ctx.fill();
+    circ(ctx,160+((t*90)%110)+6,250-Math.abs(Math.sin(t*5))*35,11,'#FFC23A');star(ctx,250,215,10,'#fff');}
+  else{ctx.fillStyle='#38425E';ctx.fillRect(157,197,122,88);ctx.strokeStyle='rgba(255,255,255,.2)';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(170,270);ctx.lineTo(200,210);ctx.stroke();}
+  ctx.fillStyle='#8A5A3A';rr(ctx,355,115,130,92,8);ctx.fill();ctx.fillStyle='#FFF8EC';ctx.fillRect(363,123,114,76);
+  const n=Math.max(1,members.length);members.forEach((m,i)=>drawFace(ctx,363+114*(i+.5)/n,161,Math.min(17,46/n+6),m));
+  ctx.fillStyle='#2E9459';rr(ctx,288,300,30,110,12);ctx.fill();rr(ctx,523,300,30,110,12);ctx.fill();
+  ctx.fillStyle='#36A866';rr(ctx,305,272,232,108,26);ctx.fill();
+  ctx.fillStyle='#2E9459';rr(ctx,305,368,232,36,12);ctx.fill();ctx.fillStyle='#257A49';ctx.fillRect(315,404,10,10);ctx.fillRect(518,404,10,10);
+  ctx.fillStyle='rgba(255,255,255,.18)';[352,420,488].forEach(x=>{rr(ctx,x-30,288,60,70,16);ctx.fill();});
+  const T=world.toilet;door(ctx,560,160,85,215,'#86C2EE',T.open);
+  ctx.fillStyle=T.occ?'#F0603C':'#36A866';rr(ctx,568,138,70,22,11);ctx.fill();ctx.fillStyle='#fff';ctx.font=`800 13px ${FB}`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(T.occ?'有人 Busy':'🚻 WC',603,149);
+  door(ctx,670,160,85,215,'#B98AE0');ctx.fillStyle='#fff';ctx.font='22px sans-serif';ctx.fillText('🌙',712,205);
+}
+function drawBedroom(ctx,t){
+  ctx.fillStyle='#E9E1FA';ctx.fillRect(0,0,W,378);ctx.fillStyle='#D5C8F2';ctx.fillRect(0,365,W,13);
+  ctx.fillStyle='#D7C2A3';ctx.fillRect(0,378,W,H-378);ctx.fillStyle='rgba(142,92,217,.18)';rr(ctx,150,440,520,90,40);ctx.fill();
+  ctx.fillStyle='#fff';rr(ctx,640,60,135,118,10);ctx.fill();
+  if(world.lightsOff){ctx.fillStyle='#1B2450';ctx.fillRect(650,70,115,98);circ(ctx,730,100,16,'#FFF4C2');circ(ctx,722,95,14,'#1B2450');[[665,90],[690,140],[750,150],[680,110]].forEach(([x,y])=>circ(ctx,x,y,2,'#fff'));}
+  else{ctx.fillStyle='#9FDBFF';ctx.fillRect(650,70,115,98);circ(ctx,738,98,15,'#FFC23A');cloud(ctx,670,140,.45);}
+  ctx.fillStyle='#fff';ctx.fillRect(704,70,6,98);
+  tube(ctx,260,440,6,!world.lightsOff);
+  door(ctx,20,160,85,215,'#F2B04A');
+  // big bed
+  ctx.fillStyle='#8E5CD9';rr(ctx,120,250,30,148,8);ctx.fill();rr(ctx,385,300,20,98,6);ctx.fill();
+  ctx.fillStyle='#6E44B8';ctx.fillRect(140,372,250,24);ctx.fillStyle='#fff';rr(ctx,140,338,250,36,8);ctx.fill();
+  ctx.fillStyle='#F4F0FF';rr(ctx,146,316,58,26,12);ctx.fill();
+  // nightstand + lamp
+  ctx.fillStyle='#B07740';rr(ctx,408,330,48,68,6);ctx.fill();ctx.fillStyle='#8A5A3A';ctx.fillRect(414,352,36,4);
+  ctx.fillStyle='#5B3A24';ctx.fillRect(429,298,6,32);ctx.fillStyle=world.lightsOff?'#9AA6B8':'#FFC23A';ctx.beginPath();ctx.moveTo(412,300);ctx.lineTo(452,300);ctx.lineTo(444,268);ctx.lineTo(420,268);ctx.closePath();ctx.fill();
+  // bunk
+  ctx.fillStyle='#2F7DE1';ctx.fillRect(450,80,12,318);ctx.fillRect(618,80,12,318);
+  ctx.fillStyle='#fff';rr(ctx,462,343,156,28,8);ctx.fill();rr(ctx,462,218,156,28,8);ctx.fill();
+  ctx.fillStyle='#2F7DE1';ctx.fillRect(462,371,156,14);ctx.fillRect(462,246,156,14);ctx.fillRect(500,192,118,10);
+  ctx.fillStyle='#F4F0FF';rr(ctx,466,322,46,22,10);ctx.fill();rr(ctx,466,197,46,22,10);ctx.fill();
+  ctx.strokeStyle='#FFB020';ctx.lineWidth=6;ctx.beginPath();ctx.moveTo(636,215);ctx.lineTo(636,398);ctx.moveTo(660,215);ctx.lineTo(660,398);for(let y=240;y<398;y+=32){ctx.moveTo(636,y);ctx.lineTo(660,y);}ctx.stroke();
+}
+function drawToybox(ctx){ctx.fillStyle='#F0603C';rr(ctx,650,375,120,62,8);ctx.fill();ctx.fillStyle='#C9442A';rr(ctx,644,362,132,18,6);ctx.fill();star(ctx,710,407,15,'#FFC23A');}
+function drawSleeper(ctx,c){
+  const s=BEDS[c.bed.id][c.bed.i],h=150*c.m.scale,hr=h*.25,tW=hr*1.6,cy=s.top-tW/2+2;
+  ctx.save();ctx.translate(s.hx+h-hr,cy);ctx.rotate(-Math.PI/2);drawChar(ctx,c.m,0,0,h,{pose:'idle'});ctx.restore();
+  ctx.fillStyle=c.bed.id==='big'?'#FF8FB8':'#FFC23A';rr(ctx,s.hx+hr*1.1,cy-tW/2-4,h-hr*1.6,tW+10,10);ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,.35)';for(let x=s.hx+hr*1.4;x<s.hx+h-hr*.6;x+=18)circ(ctx,x,cy,3.5,'rgba(255,255,255,.4)');
+  const z=(world.t*0.8+c.ph*.1)%1;ctx.globalAlpha=1-z;ctx.fillStyle=world.lightsOff?'#FFF4C2':'#5B4A9E';ctx.font=`800 ${16+z*10}px ${FD}`;ctx.textAlign='center';ctx.fillText('Z z',s.hx+10+z*16,cy-hr-12-z*26);ctx.globalAlpha=1;
+}
+function drawToy(ctx,t){
+  const x=t.x,y=t.y-t.z;ctx.fillStyle='rgba(0,0,0,.15)';ctx.beginPath();ctx.ellipse(t.x,t.y,26,7,0,0,Math.PI*2);ctx.fill();
+  if(t.type==='ball'){circ(ctx,x,y-20,20,'#fff');ctx.save();ctx.beginPath();ctx.arc(x,y-20,20,0,Math.PI*2);ctx.clip();ctx.fillStyle='#F0603C';ctx.fillRect(x-20,y-28,40,8);ctx.fillStyle='#2F7DE1';ctx.fillRect(x-20,y-16,40,8);ctx.restore();}
+  else if(t.type==='car'){const k=t.vx<0?-1:1;ctx.fillStyle='#2F7DE1';rr(ctx,x-30,y-30,60,20,6);ctx.fill();ctx.fillStyle='#9FDBFF';rr(ctx,x-14*k-8,y-44,28,16,5);ctx.fill();circ(ctx,x-18,y-8,8,'#1E2A45');circ(ctx,x+18,y-8,8,'#1E2A45');}
+  else if(t.type==='teddy'){circ(ctx,x,y-20,18,'#B07740');circ(ctx,x,y-46,14,'#B07740');circ(ctx,x-11,y-57,6,'#B07740');circ(ctx,x+11,y-57,6,'#B07740');circ(ctx,x,y-42,5,'#E8C9A0');circ(ctx,x-5,y-49,2,'#1E2A45');circ(ctx,x+5,y-49,2,'#1E2A45');}
+  else{const c=['#F0603C','#36A866','#FFC23A'];if(t.fall)c.forEach((col,i)=>{ctx.fillStyle=col;ctx.fillRect(x-36+i*25,y-20,22,20);});else c.forEach((col,i)=>{ctx.fillStyle=col;ctx.fillRect(x-12,y-22-i*22,24,22);});}
+}
+function pill(ctx,text,x,y){ctx.font=`800 13px ${FB}`;const w=ctx.measureText(text).width+16;x=clamp(x,w/2+4,W-w/2-4);y=clamp(y,16,H-16);
+  ctx.globalAlpha=.88;ctx.fillStyle='#1E2A45';rr(ctx,x-w/2,y-11,w,22,11);ctx.fill();ctx.globalAlpha=1;ctx.fillStyle='#fff';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(text,x,y+.5);}
+function bubble(ctx,text,x,y){ctx.font=`800 15px ${FB}`;const w=ctx.measureText(text).width+20,h=30,bx=clamp(x-w/2,6,W-w-6),by=Math.max(6,y-h-12);
+  ctx.fillStyle='#fff';ctx.strokeStyle='#1E2A45';ctx.lineWidth=2.5;rr(ctx,bx,by,w,h,14);ctx.fill();ctx.stroke();
+  ctx.beginPath();ctx.moveTo(clamp(x,bx+14,bx+w-14)-7,by+h-1);ctx.lineTo(clamp(x,bx+14,bx+w-14),by+h+9);ctx.lineTo(clamp(x,bx+14,bx+w-14)+7,by+h-1);ctx.fill();
+  ctx.fillStyle='#1E2A45';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(text,bx+w/2,by+h/2+1);}
+
+function render(){
+  const k=game.width/W;g.setTransform(k,0,0,k,0,0);g.clearRect(0,0,W,H);const t=world.t,sc=world.scene;
+  ({map:drawMap,school:drawSchool,home:drawHome,bedroom:drawBedroom})[sc](g,t);
+  if(world.jump){renderJump();}
+  else{
+  if(sc==='bedroom')world.chars.filter(c=>c.state==='sleep').sort((a,b)=>a.bed.i-b.bed.i).forEach(c=>drawSleeper(g,c));
+  const items=[];
+  world.chars.forEach((c,i)=>{if(c.hidden||c.state==='sleep')return;items.push({y:c.y,draw:()=>{
+    const h=charH(c),sel=i===world.sel;
+    if(c.state!=='dangle'){g.fillStyle=sel?'rgba(255,194,58,.55)':'rgba(0,0,0,.16)';g.beginPath();g.ellipse(c.x,c.y,h*(sel?.3:.24),h*.06,0,0,Math.PI*2);g.fill();}
+    if(c.state==='dangle'){g.save();g.translate(c.x,c.y-h*.8);g.rotate(Math.sin(c.ph*1.4)*.12);drawChar(g,c.m,0,h*.8,h,{pose:'dangle',phase:c.ph});g.restore();}
+    else drawChar(g,c.m,c.x,c.y,h,{pose:c.state==='walk'?'walk':c.state==='sit'?'sit':['wave','cheer','play'].includes(c.state)?c.state:'idle',phase:c.ph});
+    if(sel){const by=c.y-h-14-Math.abs(Math.sin(t*4))*6;g.fillStyle='#FFC23A';g.strokeStyle='#1E2A45';g.lineWidth=2;g.beginPath();g.moveTo(c.x-9,by-12);g.lineTo(c.x+9,by-12);g.lineTo(c.x,by);g.closePath();g.fill();g.stroke();}
+  }});});
+  if(sc==='school')DESKS.forEach(x=>items.push({y:486,draw:()=>drawDesk(g,x)}));
+  if(sc==='bedroom'){items.push({y:437,draw:()=>drawToybox(g)});world.toys.forEach(ty=>items.push({y:ty.y,draw:()=>drawToy(g,ty)}));}
+  items.sort((a,b)=>a.y-b.y).forEach(it=>it.draw());
+  }
+  if(sc==='bedroom'&&world.lightsOff){g.fillStyle='rgba(10,14,44,.6)';g.fillRect(0,0,W,H);const gr=g.createRadialGradient(705,120,10,705,120,260);gr.addColorStop(0,'rgba(180,200,255,.22)');gr.addColorStop(1,'rgba(180,200,255,0)');g.fillStyle=gr;g.fillRect(0,0,W,H);}
+  if(world.labels&&!world.jump)SC[sc].objs.forEach(o=>{if(o.lab)pill(g,o.lab,o.lx??o.hit[0]+o.hit[2]/2,o.ly??o.hit[1]-12);});
+  world.chars.forEach(c=>{if(!c.bubble)return;
+    if(c.hidden){bubble(g,'🎵 '+c.bubble,602,150);return;}
+    if(world.jump&&c===world.jump.J){const j=world.jump;bubble(g,c.bubble,j.phase==='bounce'||j.phase==='fly'||j.phase==='miss'?j.x:curCatcher().x,60);return;}
+    if(c.state==='sleep'){const s=BEDS[c.bed.id][c.bed.i];bubble(g,c.bubble,s.hx+20,s.top-70);return;}
+    bubble(g,c.bubble,c.x,c.y-charH(c)-(world.chars[world.sel]===c?26:6));});
+  if(world.toilet.occ&&world.toilet.occ.hidden&&!world.toilet.occ.bubble)pill(g,'🎵 ~',602,190);
+  if(world.fade>0){g.fillStyle=`rgba(30,42,69,${world.fade})`;g.fillRect(0,0,W,H);}
+}
+function sizeCanvas(){const r=game.getBoundingClientRect();if(!r.width)return;const dpr=Math.min(2.5,window.devicePixelRatio||1),w=Math.round(r.width*dpr);if(game.width!==w){game.width=w;game.height=Math.round(w*H/W);}}
+window.addEventListener('resize',sizeCanvas);
+let last=performance.now();
+function loop(now){const dt=Math.min(.05,(now-last)/1000);last=now;if(!document.getElementById('screen-town').hidden){update(dt);render();}requestAnimationFrame(loop);}
+
+/* =================== quiz =================== */
+const quiz={qs:[],i:0,score:0,lock:false,N:10};const askerCv=document.getElementById('askerCv');
+const BANK_N=Object.values(BANK).reduce((n,o)=>n+Object.values(o).reduce((m,a)=>m+a.length,0),0);
+function shuffle(a){a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function quizPanel(id){['quizPick','quizStage','quizDone'].forEach(k=>document.getElementById(k).hidden=k!==id);}
+function showPick(){
+  const p=world.pick;quizPanel('quizPick');
+  document.querySelectorAll('#pickSub button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===p.sub));
+  document.querySelectorAll('#pickAge button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===p.age));
+  const n=BANK[p.sub][p.age].length,bk=world.best[p.sub+'|'+p.age]||0;
+  document.getElementById('pickInfo').textContent=`这一组有 ${n} 题，每次随机抽 10 题，答对 6 题过关。最高分 ${bk}/10。\nThis set has ${n} questions. Each round picks 10 at random; 6 correct to pass. Best: ${bk}/10.`;
+}
+document.querySelectorAll('#pickSub button').forEach(b=>b.onclick=()=>{world.pick.sub=b.dataset.v;save();showPick();});
+document.querySelectorAll('#pickAge button').forEach(b=>b.onclick=()=>{world.pick.age=b.dataset.v;save();showPick();});
+function openQuiz(){document.getElementById('quizModal').hidden=false;showPick();}
+function startQuiz(){
+  const p=world.pick;quiz.qs=shuffle(BANK[p.sub][p.age]).slice(0,quiz.N).map(q=>{const o=shuffle(q.o);return{...q,o,a:o.indexOf(q.o[q.a])};});
+  quiz.i=0;quiz.score=0;quizPanel('quizStage');showQ();
+}
+function starLine(){return '★'.repeat(quiz.score)+'☆'.repeat(quiz.N-quiz.score);}
+function showQ(){
+  const q=quiz.qs[quiz.i],m=members[quiz.i%members.length],p=world.pick;quiz.lock=false;
+  document.getElementById('qNum').textContent=`${SUBJ[p.sub]} · ${p.age} 岁 · ${quiz.i+1}/${quiz.N}`;
+  document.getElementById('qStars').textContent=`⭐ ${quiz.score}`;
+  document.getElementById('qWho').textContent=`${m.name} 问 · asks:`;document.getElementById('qZh').textContent=q.zh;document.getElementById('qEn').textContent=q.en;
+  document.getElementById('qFb').textContent='';
+  const x=askerCv.getContext('2d');x.clearRect(0,0,192,230);drawChar(x,m,96,224,215*Math.max(m.scale,.8),{pose:'wave'});
+  const box=document.getElementById('qOpts');box.innerHTML='';
+  q.o.forEach((tx,j)=>{const b=document.createElement('button');b.className='opt';b.textContent=tx;b.onclick=()=>pick(j,b);box.appendChild(b);});
+}
+function pick(j,b){
+  if(quiz.lock)return;quiz.lock=true;const q=quiz.qs[quiz.i],fb=document.getElementById('qFb'),btns=[...document.querySelectorAll('.opt')];
+  if(j===q.a){quiz.score++;b.classList.add('right');fb.style.color='var(--grass)';fb.textContent='答对了！Correct! 🎉';askerCv.classList.remove('hop');void askerCv.offsetWidth;askerCv.classList.add('hop');}
+  else{b.classList.add('wrong');btns[q.a].classList.add('right');fb.style.color='var(--tomato)';fb.textContent='再想想 · Nice try! 答案 Answer: '+q.o[q.a];}
+  document.getElementById('qStars').textContent=`⭐ ${quiz.score}`;
+  setTimeout(()=>{quiz.i++;quiz.i<quiz.N?showQ():finishQuiz();},j===q.a?1100:1900);
+}
+function finishQuiz(){
+  const k=world.pick.sub+'|'+world.pick.age;world.best[k]=Math.max(world.best[k]||0,quiz.score);const pass=quiz.score>=6;
+  quizPanel('quizDone');
+  document.getElementById('doneTitle').innerHTML=pass?`过关啦！🎉<small>Well done — you passed</small>`:`差一点！<small>So close — 6 correct to pass</small>`;
+  document.getElementById('doneText').textContent=`${starLine()}\n${quiz.score} / ${quiz.N}`;
+  save();
+}
+function closeQuiz(cheer){document.getElementById('quizModal').hidden=true;if(cheer)world.chars.forEach(c=>{if(standUp(c)){c.state='cheer';c.busy=2.6;say(c,'耶！Yay!',2);}});}
+document.getElementById('qStart').onclick=startQuiz;
+document.getElementById('qAgain').onclick=startQuiz;
+document.getElementById('qNext').onclick=showPick;
+document.getElementById('qClose').onclick=()=>closeQuiz(true);
+document.getElementById('qQuit').onclick=()=>closeQuiz(false);
+document.getElementById('qPickClose').onclick=()=>closeQuiz(false);
+document.getElementById('doneText').style.whiteSpace='pre-line';
+
+/* =================== poster =================== */
+let scene='park';
+document.querySelectorAll('#scenes button').forEach(b=>b.onclick=()=>{scene=b.dataset.s;document.querySelectorAll('#scenes button').forEach(x=>x.setAttribute('aria-pressed',x===b));renderPoster();});
+document.getElementById('posterTitle').addEventListener('input',renderPoster);
+const pcv=document.createElement('canvas');pcv.width=1080;pcv.height=1350;
+function renderPoster(){
+  const ctx=pcv.getContext('2d'),PW=1080,PH=1350,ground=1150;
+  let gr=ctx.createLinearGradient(0,0,0,PH);
+  if(scene==='space'){gr.addColorStop(0,'#0B1030');gr.addColorStop(1,'#2A1E5C');}else{gr.addColorStop(0,'#7CC8FF');gr.addColorStop(1,'#E2F4FF');}
+  ctx.fillStyle=gr;ctx.fillRect(0,0,PW,PH);
+  if(scene==='park'){circ(ctx,900,250,90,'#FFC23A');ctx.fillStyle='#7FD08F';ctx.beginPath();ctx.ellipse(250,1080,520,220,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#5BBE74';ctx.beginPath();ctx.ellipse(880,1100,520,240,0,0,Math.PI*2);ctx.fill();ctx.fillStyle='#36A866';ctx.fillRect(0,ground-20,PW,PH);
+    const fc=['#FF8FB8','#FFC23A','#fff','#F0603C'];for(let i=0;i<26;i++)circ(ctx,(i*173)%PW+20,ground+30+(i*57)%150,10,fc[i%4]);}
+  else if(scene==='beach'){circ(ctx,180,240,90,'#FFC23A');ctx.fillStyle='#2F9BE0';ctx.fillRect(0,820,PW,300);ctx.strokeStyle='rgba(255,255,255,.6)';ctx.lineWidth=6;
+    for(let y=860;y<1100;y+=60){ctx.beginPath();for(let x=0;x<=PW;x+=40)ctx.lineTo(x,y+Math.sin(x/40)*8);ctx.stroke();}
+    ctx.fillStyle='#F4D58D';ctx.beginPath();ctx.moveTo(0,1060);ctx.quadraticCurveTo(540,1000,PW,1060);ctx.lineTo(PW,PH);ctx.lineTo(0,PH);ctx.fill();}
+  else{for(let i=0;i<120;i++)circ(ctx,(i*397)%PW,(i*233)%1000,(i%3)+1.5,'rgba(255,255,255,'+(.3+(i%5)/7)+')');circ(ctx,880,300,110,'#F0603C');
+    ctx.strokeStyle='#FFC23A';ctx.lineWidth=14;ctx.beginPath();ctx.ellipse(880,300,190,45,-.3,0,Math.PI*2);ctx.stroke();
+    ctx.fillStyle='#8A93B8';ctx.beginPath();ctx.ellipse(540,1250,800,240,0,0,Math.PI*2);ctx.fill();}
+  const n=members.length,sp=PW/n,hh=n>4?470:560;
+  members.forEach((m,i)=>drawChar(ctx,m,sp*(i+.5),ground+10,hh*m.scale,{pose:i%2?'wave':'idle'}));
+  const t=document.getElementById('posterTitle').value||'我们这一家';ctx.textAlign='center';ctx.textBaseline='alphabetic';
+  let fs=92;ctx.font=`800 ${fs}px ${FD}`;while(ctx.measureText(t).width>PW-120&&fs>40){fs-=4;ctx.font=`800 ${fs}px ${FD}`;}
+  ctx.lineJoin='round';ctx.lineWidth=18;ctx.strokeStyle='#1E2A45';ctx.strokeText(t,PW/2,170);ctx.fillStyle='#fff';ctx.fillText(t,PW/2,170);
+  const d=new Date();ctx.font=`700 34px ${FB}`;ctx.fillStyle=scene==='space'?'#fff':'#1E2A45';ctx.fillText(`${d.getFullYear()}.${d.getMonth()+1}.${d.getDate()} · Family Toon Party`,PW/2,1310);
+  document.getElementById('posterImg').src=pcv.toDataURL('image/jpeg',.9);
+}
+
+/* =================== tabs, save, boot =================== */
+const screens=['team','town','poster'];
+function show(k){screens.forEach(n=>{document.getElementById('screen-'+n).hidden=n!==k;document.getElementById('tab-'+n).setAttribute('aria-pressed',n===k);});
+  if(k==='town'){sizeCanvas();buildChips();}if(k==='poster')renderPoster();window.scrollTo(0,0);}
+screens.forEach(k=>document.getElementById('tab-'+k).onclick=()=>show(k));
+document.getElementById('enterTown').onclick=()=>show('town');
+function refreshAll(){syncChars();renderTeam();buildChips();if(!document.getElementById('screen-poster').hidden)renderPoster();}
+function save(){try{localStorage.setItem(KEY,JSON.stringify({members:members.map(m=>({preset:m.preset,name:m.name,face:m.faceURL})),pick:world.pick,best:world.best}));}catch(e){}}
+function load(){
+  let d=null;try{d=JSON.parse(localStorage.getItem(KEY)||'null');}catch(e){}
+  if(!d||!Array.isArray(d.members)||!d.members.length){members=['dad','mum','kid','friend'].map(p=>mk(p));return false;}
+  members=d.members.filter(x=>PRESETS[x.preset]).map(x=>{const m=mk(x.preset,{name:x.name||PRESETS[x.preset].name});
+    if(x.face){m.faceURL=x.face;const im=new Image();im.onload=()=>{m.face=im;refreshAll();};im.src=x.face;}return m;});
+  if(!members.length)members=['dad','mum','kid','friend'].map(p=>mk(p));
+  if(d.pick&&BANK[d.pick.sub]&&BANK[d.pick.sub][d.pick.age])world.pick=d.pick;if(d.best&&!Array.isArray(d.best)&&typeof d.best==='object')world.best=d.best;
+  return members.some(m=>m.faceURL);
+}
+const hadFaces=load();
+syncChars();renderTeam();buildChips();
+world.pending={name:'map',from:'_'};doSwitch();
+if(hadFaces)show('town');
+(document.fonts?document.fonts.ready:Promise.resolve()).then(()=>{renderTeam();});
+requestAnimationFrame(loop);
+</script>
+
+</body>
+</html>
